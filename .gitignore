@@ -216,3 +216,14 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# AI
+.claude/
+
+# WorkBridge — 真实配置文件（含敏感信息）
+server/nginx-mcp.conf
+server/.env
+client/.env
+*.env
+# 但保留 .example 模板
+!*.env.example
