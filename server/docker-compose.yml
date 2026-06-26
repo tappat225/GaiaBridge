@@ -4,12 +4,12 @@ services:
     container_name: mcp-server
     restart: unless-stopped
     ports:
-      - "127.0.0.1:9020:8000"   # 只监听本地，由 nginx 反向代理暴露
+      - "127.0.0.1:9020:8000"   # listen on localhost only, exposed via nginx reverse proxy
     volumes:
-      - /home/ubuntu/repo:/workspace:rw   # 挂载主机 repo 目录
+      - /home/ubuntu/repo:/workspace:rw   # mount host repo directory
     environment:
       - WORKSPACE_DIR=/workspace
       - COMMAND_TIMEOUT=120
-    # 如果容器需要执行 docker 命令，可以挂载 docker socket
+    # If the container needs to run docker commands, mount the docker socket:
     # volumes:
     #   - /var/run/docker.sock:/var/run/docker.sock:ro

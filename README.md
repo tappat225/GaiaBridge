@@ -6,18 +6,18 @@ Remote server control via MCP (Model Context Protocol). Allows an AI agent to sa
 
 ```
 WorkBridge/
-├── server/                  # 服务端：Docker 容器 + MCP Server
-│   ├── server.py            #   FastMCP 主程序
-│   ├── Dockerfile           #   容器镜像
-│   ├── docker-compose.yml   #   一键启动
-│   ├── requirements.txt     #   Python 依赖
-│   ├── nginx-mcp.conf.example  # Nginx 配置模板
-│   └── .env.example         #   环境变量模板
-├── client/                  # 客户端：CLI + Daemon
-│   ├── mcp_client.py        #   命令行客户端
-│   ├── mcp_daemon.py        #   持久会话守护进程
-│   ├── test_nginx.py        #   端到端测试脚本
-│   └── .env.example         #   环境变量模板
+├── server/                         # Server: Docker container + MCP Server
+│   ├── server.py                   #   FastMCP application
+│   ├── Dockerfile                  #   Container image
+│   ├── docker-compose.yml          #   One-command startup
+│   ├── requirements.txt            #   Python dependencies
+│   ├── nginx-mcp.conf.example      #   Nginx config template
+│   └── .env.example                #   Environment variable template
+├── client/                         # Client: CLI + Daemon
+│   ├── mcp_client.py               #   Command-line client
+│   ├── mcp_daemon.py               #   Persistent session daemon
+│   ├── test_nginx.py               #   End-to-end test script
+│   └── .env.example                #   Environment variable template
 ├── README.md
 └── .gitignore
 ```
@@ -62,15 +62,15 @@ All paths are **relative to the workspace root** (`/workspace` inside the contai
 ```bash
 cd server/
 
-# 创建真实配置文件
+# Create real config files from templates
 cp nginx-mcp.conf.example nginx-mcp.conf
 cp .env.example .env
 
-# 编辑 nginx-mcp.conf，替换 <your-bearer-token> 为真实 token
-# 编辑 .env，设置工作目录和超时等参数
+# Edit nginx-mcp.conf: replace <your-bearer-token> with a real token
+# Edit .env: set workspace directory and timeout as needed
 ```
 
-将 `nginx-mcp.conf` 的内容合并到你的 Nginx HTTPS server 块中。
+Merge the content of `nginx-mcp.conf` into your Nginx HTTPS server block.
 
 ### 2. Build & run the server
 
@@ -86,11 +86,11 @@ Server listens on `127.0.0.1:9020` (local only — exposed by Nginx).
 ```bash
 cd client/
 
-# 创建真实配置文件
+# Create real config file from template
 cp .env.example .env
 
-# 编辑 .env，填入真实的 MCP_URL 和 AUTH_TOKEN
-# 然后在 shell 中加载：source .env
+# Edit .env: fill in your real MCP_URL and AUTH_TOKEN
+# Then load it in your shell: source .env
 ```
 
 ### 4. Use the CLI client
@@ -98,10 +98,10 @@ cp .env.example .env
 ```bash
 cd client/
 
-# 加载环境变量
+# Load environment variables
 source .env
 
-# Direct HTTPS（每次调用都做 TLS + MCP 握手）
+# Direct HTTPS (TLS + MCP handshake on every call)
 python3 mcp_client.py write_file path/to/file.txt "content here"
 python3 mcp_client.py read_file path/to/file.txt
 python3 mcp_client.py run_command "ls -la"
@@ -112,15 +112,15 @@ python3 mcp_client.py system_info
 python3 mcp_client.py shell
 ```
 
-### 5. Start the daemon（faster — keeps one MCP session alive）
+### 5. Start the daemon (faster — keeps one MCP session alive)
 
 ```bash
 cd client/
 source .env
 
-python3 mcp_daemon.py --daemonize   # 后台启动
-python3 mcp_client.py write_file ... # 自动走 daemon socket
-python3 mcp_daemon.py --stop        # 停止
+python3 mcp_daemon.py --daemonize   # start in background
+python3 mcp_client.py write_file ... # automatically uses daemon socket
+python3 mcp_daemon.py --stop        # stop when done
 ```
 
 ### 6. Connect an AI agent
@@ -155,7 +155,7 @@ The server follows the standard MCP JSON-RPC protocol over streamable HTTP.
 
 ### Nginx (`server/nginx-mcp.conf`)
 
-复制 `nginx-mcp.conf.example` → `nginx-mcp.conf`，替换 `<your-bearer-token>` 为真实 token，然后将内容合并到你的 HTTPS server 块中。
+Copy `nginx-mcp.conf.example` to `nginx-mcp.conf`, replace `<your-bearer-token>` with a real token, then merge the content into your Nginx HTTPS server block.
 
 ## Filesystem Mapping
 

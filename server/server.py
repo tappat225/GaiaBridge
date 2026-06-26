@@ -1,15 +1,15 @@
 """
-Remote MCP Server —— 允许外部 AI Agent 通过 HTTPS 远程操作本服务器。
+Remote MCP Server — allows external AI agents to operate this server remotely over HTTPS.
 
-暴露的工具：
-  - run_command    : 执行 shell 命令（带超时保护）
-  - read_file      : 读取工作目录下的文件
-  - write_file     : 在工作目录下写入文件
-  - list_directory : 列出目录内容
-  - system_info    : 查看系统状态（磁盘、内存等）
+Exposed tools:
+  - run_command    : execute shell commands (with timeout protection)
+  - read_file      : read files under the workspace directory
+  - write_file     : write files under the workspace directory
+  - list_directory : list directory contents
+  - system_info    : view system status (disk, memory, etc.)
 
-鉴权由 Nginx 层的 Authorization Bearer Token 负责，
-本服务只处理 MCP 协议本身。
+Authentication is handled by Nginx via Authorization Bearer Token.
+This service only processes the MCP protocol itself.
 """
 
 import asyncio
@@ -20,14 +20,14 @@ from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 
 # ============================================================
-# 配置
+# Configuration
 # ============================================================
 WORKSPACE = Path(os.environ.get("WORKSPACE_DIR", "/workspace"))
-COMMAND_TIMEOUT = int(os.environ.get("COMMAND_TIMEOUT", "60"))  # 秒
-ALLOWED_READ_EXTENSIONS = os.environ.get("ALLOWED_READ_EXTENSIONS", "").split(",") if os.environ.get("ALLOWED_READ_EXTENSIONS") else None  # None = 全部允许
+COMMAND_TIMEOUT = int(os.environ.get("COMMAND_TIMEOUT", "60"))  # seconds
+ALLOWED_READ_EXTENSIONS = os.environ.get("ALLOWED_READ_EXTENSIONS", "").split(",") if os.environ.get("ALLOWED_READ_EXTENSIONS") else None  # None = allow all
 
 # ============================================================
-# FastMCP 实例
+# FastMCP instance
 # ============================================================
 mcp = FastMCP(
     name="Remote Server Agent",
@@ -46,7 +46,7 @@ Always verify your actions before executing. The workspace is the primary direct
 
 
 # ============================================================
-# 辅助函数
+# Helper functions
 # ============================================================
 def _resolve_path(path: str) -> Path:
     """Resolve a user-supplied path into the workspace directory.
@@ -83,7 +83,7 @@ def _resolve_path(path: str) -> Path:
 
 
 # ============================================================
-# 工具定义
+# Tool definitions
 # ============================================================
 @mcp.tool()
 async def run_command(command: str, cwd: str = ".") -> str:
@@ -252,8 +252,8 @@ async def system_info() -> str:
 
 
 # ============================================================
-# 启动入口
+# Entry point
 # ============================================================
 if __name__ == "__main__":
-    # streamable-http 传输，host/port 已在 FastMCP 构造函数中配置
+    # streamable-http transport; host/port already set in FastMCP constructor
     mcp.run(transport="streamable-http")

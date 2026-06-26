@@ -1,28 +1,28 @@
 # ============================================================
-# MCP Server — Nginx 配置片段
-# 添加到 /etc/nginx/sites-available/<your-domain> 的 HTTPS server 块内
+# MCP Server — Nginx configuration snippet
+# Add to the HTTPS server block in /etc/nginx/sites-available/<your-domain>
 # ============================================================
 
-# 认证 token 映射
+# Authentication token mapping
 map $http_authorization $mcp_auth_result {
     "Bearer <your-bearer-token>"  "ok";
     default                                                                      "denied";
 }
 
-# 只在 MCP location 中检查 token
-# （map 放在 server 块外面，location 块放在 HTTPS server 内）
+# Token is only checked in the MCP location
+# (map goes outside the server block, location goes inside the HTTPS server block)
 
-# ----- 以下是添加到 HTTPS server { } 块内的内容 -----
+# ----- Add the following inside the HTTPS server { } block -----
 
-# MCP Server 端点（受 Bearer Token 保护）
+# MCP Server endpoint (protected by Bearer Token)
 location /_mcp {
-    # Token 校验
+    # Token validation
     if ($mcp_auth_result = "denied") {
         return 401 '{"error":"unauthorized","message":"Valid Bearer token required"}\n';
         add_header Content-Type application/json;
     }
 
-    # 代理到 Docker 容器内的 MCP Server
+    # Proxy to MCP Server inside Docker container
     proxy_pass http://127.0.0.1:9020/mcp;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
@@ -30,13 +30,13 @@ location /_mcp {
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
 
-    # SSE / Streamable HTTP 必须关掉缓冲
+    # SSE / Streamable HTTP requires disabled buffering
     proxy_buffering off;
     proxy_cache off;
     proxy_read_timeout 3600s;
     proxy_send_timeout 3600s;
 
-    # 支持 Upgrade（如果以后用 WebSocket）
+    # Support Upgrade header (for future WebSocket use)
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
 }
