@@ -87,7 +87,7 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-Master listens on `127.0.0.1:8100`. Use Nginx to expose it over HTTPS.
+Master listens on `127.0.0.1:9210`. Use Nginx to expose it over HTTPS.
 
 ### 2. Deploy Worker (on any node)
 
@@ -104,7 +104,7 @@ The worker connects outbound to Master and waits for tasks.
 ### 3. Dispatch a task
 
 ```bash
-curl -X POST https://<master-domain>:8100/api/tasks/dispatch_sync \
+curl -X POST https://<master-domain>:9210/api/tasks/dispatch_sync \
   -H "Authorization: Bearer <client-token>" \
   -H "Content-Type: application/json" \
   -d '{"target_node": "worker-1", "payload": {"task_type": "shell", "params": {"command": "uname -a"}}}'
@@ -131,7 +131,7 @@ curl -X POST https://<master-domain>:8100/api/tasks/dispatch_sync \
 | Env var | Default | Description |
 |---|---|---|
 | `MASTER_HOST` | `0.0.0.0` | Bind address |
-| `MASTER_PORT` | `8100` | Listen port |
+| `MASTER_PORT` | `9210` | Listen port |
 | `NODE_TOKEN` | (required) | Token for worker authentication |
 | `CLIENT_TOKEN` | (required) | Token for client/agent authentication |
 | `HEARTBEAT_TIMEOUT` | `60` | Seconds before marking node offline |

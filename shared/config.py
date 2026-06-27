@@ -7,7 +7,7 @@ from dataclasses import dataclass
 @dataclass
 class MasterConfig:
     host: str = os.environ.get("MASTER_HOST", "0.0.0.0")
-    port: int = int(os.environ.get("MASTER_PORT", "8100"))
+    port: int = int(os.environ.get("MASTER_PORT", "9210"))
     node_token: str = os.environ.get("NODE_TOKEN", "")
     client_token: str = os.environ.get("CLIENT_TOKEN", "")
     heartbeat_timeout: int = int(os.environ.get("HEARTBEAT_TIMEOUT", "60"))

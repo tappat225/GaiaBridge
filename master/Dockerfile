@@ -16,6 +16,6 @@ COPY master/ /app/master/
 RUN mkdir -p /app/data && chown master:master /app/data
 
 USER master
-EXPOSE 8100
+EXPOSE 9210
 
 CMD ["python", "-m", "master.app"]

@@ -6,14 +6,14 @@ services:
     container_name: workbridge-master
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8100:8100"
+      - "127.0.0.1:9210:9210"
     volumes:
       - master-data:/app/data
     env_file:
       - .env
     environment:
       - MASTER_HOST=0.0.0.0
-      - MASTER_PORT=8100
+      - MASTER_PORT=9210
       - MASTER_DB=/app/data/registry.db
 
 volumes:
