@@ -5,5 +5,8 @@ workspace = "/workspace"
 command_timeout = 120
 reconnect_interval = 5
 
+[deployment]
+host_workspace = "/home/ubuntu/repo"
+
 [auth]
 node_token = "<your-node-token>"

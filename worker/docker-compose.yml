@@ -12,7 +12,7 @@ services:
     restart: unless-stopped
     network_mode: host
     volumes:
-      - ${WORKBRIDGE_WORKSPACE_DIR:-/home/ubuntu/repo}:/workspace:rw
+      - ${WORKBRIDGE_HOST_WORKSPACE:-/home/ubuntu/repo}:${WORKBRIDGE_CONTAINER_WORKSPACE:-/workspace}:rw
       - ./config.toml:/etc/workbridge/worker.toml:ro
     environment:
       - WORKBRIDGE_CONFIG=/etc/workbridge/worker.toml

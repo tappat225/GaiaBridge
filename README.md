@@ -133,6 +133,7 @@ cd worker/
 cp config.toml.example config.toml
 # Edit config.toml: set worker.node_id, worker.master_url, and auth.node_token
 # Use the SAME node_token from Master config
+# Set deployment.host_workspace to the absolute host path this worker may operate in
 
 # Build (same pattern as Master)
 DOCKER_BUILDKIT=0 docker build --network=host \
@@ -145,11 +146,21 @@ docker compose up -d
 
 The worker connects outbound to Master and waits for tasks.
 
-To mount a different host workspace into the worker container, set
-`WORKBRIDGE_WORKSPACE_DIR` when starting Docker Compose:
+By default, tasks run inside the container under `/workspace`. The helper script
+reads `deployment.host_workspace` from `config.toml`, mounts that host path to
+`worker.workspace`, and starts the service:
 
 ```bash
-WORKBRIDGE_WORKSPACE_DIR=/home/ubuntu/repo docker compose up -d
+./deploy.sh
+```
+
+If you run Docker Compose directly, set `WORKBRIDGE_HOST_WORKSPACE` to the host
+path and keep `WORKBRIDGE_CONTAINER_WORKSPACE` aligned with `worker.workspace`:
+
+```bash
+WORKBRIDGE_HOST_WORKSPACE=/home/ubuntu/repo \
+WORKBRIDGE_CONTAINER_WORKSPACE=/workspace \
+docker compose up -d
 ```
 
 ### 4. Same-machine Master + Worker
@@ -225,13 +236,15 @@ file mounts `master/config.toml` there automatically.
 | `worker.node_id` | `NODE_ID` | (required) | Unique identifier for this worker |
 | `worker.master_url` | `MASTER_URL` | `https://localhost:9210` | Master endpoint URL |
 | `auth.node_token` | `NODE_TOKEN` | (required) | Authentication token (must match Master) |
-| `worker.workspace` | `WORKSPACE_DIR` | `/workspace` | Container workspace path |
+| `worker.workspace` | `WORKSPACE_DIR` | `/workspace` | Container workspace path used by task executors |
 | `worker.command_timeout` | `COMMAND_TIMEOUT` | `120` | Shell command timeout in seconds |
 | `worker.reconnect_interval` | `RECONNECT_INTERVAL` | `5` | Seconds between reconnect attempts |
+| `deployment.host_workspace` | - | (required by `worker/deploy.sh`) | Host path mounted into `worker.workspace` |
 
 The Worker container reads `/etc/workbridge/worker.toml`; the provided Compose
-file mounts `worker/config.toml` there automatically. The host directory mounted
-to `/workspace` is controlled by `WORKBRIDGE_WORKSPACE_DIR`.
+file mounts `worker/config.toml` there automatically. When using
+`worker/deploy.sh`, `deployment.host_workspace` is injected into Docker Compose
+as `WORKBRIDGE_HOST_WORKSPACE` and mounted at `worker.workspace`.
 
 ### Client (`client/config.ini`)
 
