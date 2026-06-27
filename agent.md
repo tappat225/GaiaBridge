@@ -129,3 +129,41 @@ Cross-directory imports must go through `shared/`. Master and Worker must not im
 - Commit messages must be in English, using a concise imperative style
 - Example: `Add task dispatch endpoint to master API`
 - Before committing, verify no sensitive files (.env, real config files, real tokens) are included
+
+### 14. Docker Build
+
+- **ARG scoping**: ARGs declared before `FROM` are only visible to the
+  `FROM` instruction. To use them in `RUN` steps, re-declare them after
+  `FROM` (without default values).
+- **Build network**: Some cloud VMs have no DNS on Docker's default bridge.
+  Use `DOCKER_BUILDKIT=0 docker build --network=host` to let build
+  containers use the host network stack.
+- **International mirrors**: Dockerfiles accept `APT_MIRROR` and
+  `PIP_INDEX_URL` build args. Defaults are international (deb.debian.org,
+  pypi.org). For China deployments, pass
+  `APT_MIRROR=mirrors.tuna.tsinghua.edu.cn` and
+  `PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple`.
+- **No `.env` files**: Mirror configuration goes through docker-compose
+  build args with environment variable overrides, not `.env` files.
+
+### 15. SSE Implementation
+
+- `sse-starlette` sends SSE events separated by `\r\n\r\n` (CRLF), per the
+  SSE spec. Worker daemons must split the byte stream by `\r\n\r\n`, NOT
+  `\n\n`.
+- Workers must use an async HTTP client (`httpx`, `aiohttp`) for SSE
+  streaming. Synchronous `urllib` may hang on uvicorn-served chunked
+  responses.
+- Master SSE endpoint (`/api/events?node_id=X`) requires Node Token auth.
+  It uses server-sent events with `event: task` and `event: ping` types.
+- Nginx must have `proxy_buffering off`, `proxy_cache off`, and long
+  timeouts (`proxy_read_timeout 3600s`) for the SSE location block.
+
+### 16. Workspace
+
+- Worker `config.toml` must use the **container path** (`/workspace`)
+  for the workspace setting — NOT the host path.
+- The host-to-container mapping is handled by Docker volumes; the
+  executor inside the container sees only `/workspace`.
+- `WORKBRIDGE_WORKSPACE_DIR` controls which host directory is mounted
+  to `/workspace` in the worker container.

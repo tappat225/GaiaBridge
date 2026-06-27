@@ -4,9 +4,8 @@ import asyncio
 import json
 import logging
 import platform
-import ssl
-import urllib.request
-import urllib.error
+
+import httpx
 
 from shared.config import WorkerConfig, load_worker_config
 from shared.protocol import TaskResult, TaskStatus, TaskType
@@ -29,26 +28,20 @@ class WorkerDaemon:
     def _headers(self):
         return {
             "Authorization": f"Bearer {self._config.node_token}",
-            "Accept": "text/event-stream",
         }
 
     def _register(self):
         url = self._config.master_url.rstrip("/") + "/api/nodes/register"
-        data = json.dumps({
+        data = {
             "node_id": self._config.node_id,
             "hostname": platform.node(),
             "os": platform.system().lower(),
             "capabilities": ["shell", "file"],
             "workspace": self._config.workspace,
-        }).encode()
-        req = urllib.request.Request(
-            url, data=data, method="POST",
-            headers={"Content-Type": "application/json",
-                     "Authorization": f"Bearer {self._config.node_token}"})
-        ctx = ssl.create_default_context()
-        resp = urllib.request.urlopen(req, context=ctx, timeout=15)
+        }
+        resp = httpx.post(url, json=data, headers=self._headers(), timeout=15)
         logger.info("worker: registered as %s", self._config.node_id)
-        return resp.status == 200
+        return resp.status_code == 200
 
     async def _handle_task(self, task_data: dict):
         task_id = task_data.get("task_id", "")
@@ -83,26 +76,25 @@ class WorkerDaemon:
     async def _listen_sse(self):
         url = (self._config.master_url.rstrip("/") +
                f"/api/events?node_id={self._config.node_id}")
-        req = urllib.request.Request(url, headers=self._headers())
-        ctx = ssl.create_default_context()
+        headers = {**self._headers(), "Accept": "text/event-stream"}
 
-        resp = urllib.request.urlopen(req, context=ctx, timeout=300)
-        logger.info("worker: SSE connected to master")
+        async with httpx.AsyncClient(timeout=httpx.Timeout(300, connect=15)) as client:
+            async with client.stream("GET", url, headers=headers) as resp:
+                logger.info("worker: SSE connected to master")
 
-        buffer = ""
-        while self._running:
-            chunk = resp.read(4096)
-            if not chunk:
-                break
-            buffer += chunk.decode("utf-8", errors="replace")
-            while "\n\n" in buffer:
-                event_str, buffer = buffer.split("\n\n", 1)
-                await self._process_sse_event(event_str)
+                buffer = ""
+                async for chunk in resp.aiter_bytes():
+                    if not self._running:
+                        break
+                    buffer += chunk.decode("utf-8", errors="replace")
+                    while "\r\n\r\n" in buffer:
+                        event_str, buffer = buffer.split("\r\n\r\n", 1)
+                        await self._process_sse_event(event_str)
 
     async def _process_sse_event(self, raw: str):
         event_type = ""
         data_str = ""
-        for line in raw.split("\n"):
+        for line in raw.split("\r\n"):
             if line.startswith("event:"):
                 event_type = line[6:].strip()
             elif line.startswith("data:"):

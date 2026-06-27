@@ -83,20 +83,64 @@ WorkBridge/
 cd master/
 cp config.toml.example config.toml
 # Edit config.toml: set auth.node_token and auth.client_token
+# Generate tokens with: python3 -c "import secrets; print(secrets.token_hex(32))"
 
-docker compose up -d --build
+# Build (default Docker Hub + PyPI, for foreign servers)
+DOCKER_BUILDKIT=0 docker build --network=host \
+  -t workbridge-master -f Dockerfile ..
+
+# Build (China mirrors: Tsinghua for pip/apt)
+DOCKER_BUILDKIT=0 docker build --network=host \
+  --build-arg APT_MIRROR=mirrors.tuna.tsinghua.edu.cn \
+  --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+  -t workbridge-master -f Dockerfile ..
+
+docker compose up -d
 ```
 
 Master listens on `127.0.0.1:9210`. Use Nginx to expose it over HTTPS.
 
-### 2. Deploy Worker (on any node)
+### 2. Configure Nginx
+
+Merge the following into your HTTPS server block (see `master/nginx.conf.example`):
+
+```nginx
+location /wb/ {
+    proxy_pass http://127.0.0.1:9210/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    # SSE requires disabled buffering
+    proxy_buffering off;
+    proxy_cache off;
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+}
+```
+
+Then reload: `sudo nginx -t && sudo systemctl reload nginx`
+
+### 3. Deploy Worker (on any node)
 
 ```bash
 cd worker/
 cp config.toml.example config.toml
 # Edit config.toml: set worker.node_id, worker.master_url, and auth.node_token
+# Use the SAME node_token from Master config
 
-docker compose up -d --build
+# Build (same pattern as Master)
+DOCKER_BUILDKIT=0 docker build --network=host \
+  --build-arg APT_MIRROR=mirrors.tuna.tsinghua.edu.cn \
+  --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+  -t workbridge-worker -f Dockerfile ..
+
+docker compose up -d
 ```
 
 The worker connects outbound to Master and waits for tasks.
@@ -105,13 +149,30 @@ To mount a different host workspace into the worker container, set
 `WORKBRIDGE_WORKSPACE_DIR` when starting Docker Compose:
 
 ```bash
-WORKBRIDGE_WORKSPACE_DIR=/home/ubuntu/repo docker compose up -d --build
+WORKBRIDGE_WORKSPACE_DIR=/home/ubuntu/repo docker compose up -d
 ```
 
-### 3. Dispatch a task
+### 4. Same-machine Master + Worker
+
+When Master and Worker run on the same host, point the Worker directly
+at localhost to avoid network path issues with SSE streaming:
+
+```toml
+# worker/config.toml
+master_url = "http://127.0.0.1:9210"
+```
+
+### 5. Dispatch a task
 
 ```bash
-curl -X POST https://<master-domain>:9210/api/tasks/dispatch_sync \
+# Via nginx proxy (external clients):
+curl -X POST https://<master-domain>/wb/api/tasks/dispatch \
+  -H "Authorization: Bearer <client-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"target_node": "worker-1", "payload": {"task_type": "shell", "params": {"command": "uname -a"}}}'
+
+# Or direct to Master port (local):
+curl -X POST http://127.0.0.1:9210/api/tasks/dispatch \
   -H "Authorization: Bearer <client-token>" \
   -H "Content-Type: application/json" \
   -d '{"target_node": "worker-1", "payload": {"task_type": "shell", "params": {"command": "uname -a"}}}'
@@ -185,6 +246,51 @@ passed with `--config` / `WORKBRIDGE_CLIENT_CONFIG`.
 | `client.socket_path` | `MCP_SOCKET_PATH` | `/tmp/mcp-daemon.sock` | Daemon Unix socket path |
 | `client.pid_file` | `MCP_PID_FILE` | `/tmp/mcp-daemon.pid` | Daemon PID file path |
 
+## Build System
+
+### Docker build requirements
+
+Two flags are REQUIRED to build on machines where Docker's default bridge
+network has no DNS resolution (common on cloud VMs):
+
+| Flag | Why |
+|---|---|
+| `DOCKER_BUILDKIT=0` | BuildKit's `--network=host` does not work reliably; the legacy builder passes host networking through to intermediate containers |
+| `--network=host` | Lets the build container use the host's network stack so `apt-get` and `pip` can reach external repos |
+
+### ARG scoping (Dockerfile)
+
+ARGs declared *before* `FROM` are only visible in the `FROM` instruction.
+To use them in `RUN` steps, re-declare them after `FROM` (without default values):
+
+```dockerfile
+ARG APT_MIRROR=deb.debian.org
+FROM ${PYTHON_IMAGE}
+ARG APT_MIRROR          # re-declare to bring into scope
+RUN sed -i "s|http://deb.debian.org|http://${APT_MIRROR}|g" ...
+```
+
+### Sudo and environment variables
+
+`sudo` strips most environment variables by default. When running `docker
+compose build` with `sudo`, env vars like `APT_MIRROR` never reach the
+docker-compose process. Either:
+
+- Pass them explicitly: `sudo -E env APT_MIRROR=... docker compose build`
+- Or build directly with `docker build` and pass `--build-arg`
+
+### Mirror configuration
+
+| Build arg | Default (international) | China example |
+|---|---|---|
+| `PYTHON_IMAGE` | `python:3.12-slim` | (keep default, Docker Hub works) |
+| `APT_MIRROR` | `deb.debian.org` | `mirrors.tuna.tsinghua.edu.cn` |
+| `PIP_INDEX_URL` | `https://pypi.org/simple` | `https://pypi.tuna.tsinghua.edu.cn/simple` |
+
+The docker-compose files read these from environment variables with
+international defaults. To switch to Chinese mirrors, export the vars
+before building or pass them as `--build-arg` to `docker build`.
+
 ## Security
 
 - **Dual token scheme**: Node Token (worker identity) and Client Token (dispatch authority) are separate
@@ -197,21 +303,49 @@ passed with `--config` / `WORKBRIDGE_CLIENT_CONFIG`.
 
 ## Troubleshooting
 
+### Build fails with "Undetermined Error" (apt-get)
+
+The build container cannot reach the Debian repositories. Three fixes:
+
+1. Use `DOCKER_BUILDKIT=0 docker build --network=host` (legacy builder + host network)
+2. Use a mirror closer to your server via `--build-arg APT_MIRROR=...`
+3. Check that the `APTMIRROR` build arg is **re-declared after `FROM`** in the Dockerfile (ARG scoping rule)
+
+### Build fails with "deb.debian.org" in logs even though mirror is set
+
+The `--build-arg` value is not reaching the `RUN` instruction. Most likely
+the ARG is declared before `FROM` but not re-declared inside the stage.
+See "ARG scoping" in the Build System section above.
+
 ### Worker cannot connect to Master
 
 - Verify Master is reachable: `curl <MASTER_URL>/health`
 - Check `NODE_TOKEN` matches the Master configuration
 - Ensure outbound HTTPS is not blocked by firewall
 
-### Task dispatched but no result
+### Task dispatched but no result / Worker shows no "executing task" log
 
 - Check if the target worker is online: `GET /api/nodes`
 - Verify the worker SSE connection is active (Master logs show "broker: node X connected")
 - Check worker logs: `docker compose logs worker`
+- **SSE line-ending mismatch**: `sse-starlette` sends events separated by
+  `\r\n\r\n` (CRLF, per the SSE spec). If the worker splits the stream by
+  `\n\n` (LF only), events will never be parsed. The daemon must use
+  `\r\n\r\n` as the event delimiter, or normalize line endings first.
+- **Same-machine worker**: prefer `master_url = "http://127.0.0.1:9210"`
+  to avoid SSE streaming issues through the public IP / NAT path.
+- **Blocking HTTP client**: `urllib.request.urlopen().read()` may hang
+  indefinitely on SSE streams served by uvicorn. Use an async HTTP
+  client (`httpx`, `aiohttp`) with streaming support instead.
 
 ### Rebuild after code changes
 
 ```bash
-cd master/  # or worker/
-docker compose up -d --build
+cd <project-root>
+DOCKER_BUILDKIT=0 docker build --no-cache --network=host \
+  --build-arg APT_MIRROR=mirrors.tuna.tsinghua.edu.cn \
+  --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+  -t workbridge-master -f master/Dockerfile .
+cd master/ && docker compose up -d
+# Repeat for worker/
 ```
