@@ -5,34 +5,47 @@ cd "$(dirname "$0")"
 
 CONFIG_PATH="${WORKBRIDGE_CONFIG_FILE:-config.toml}"
 
-host_workspace="$(
-  python3 - "$CONFIG_PATH" <<'PY'
-import sys
-import tomllib
+toml_get() {
+  local section="$1"
+  local key="$2"
+  local fallback="${3:-}"
 
-with open(sys.argv[1], "rb") as f:
-    config = tomllib.load(f)
+  awk -v section="$section" -v key="$key" -v fallback="$fallback" '
+    /^[[:space:]]*\[/ {
+      in_section = ($0 ~ "^[[:space:]]*\\[" section "\\][[:space:]]*($|#)")
+      next
+    }
+    in_section {
+      line = $0
+      sub(/[[:space:]]*#.*/, "", line)
+      pattern = "^[[:space:]]*" key "[[:space:]]*="
+      if (line ~ pattern) {
+        sub(pattern "[[:space:]]*", "", line)
+        sub(/[[:space:]]+$/, "", line)
+        if (line ~ /^".*"$/) {
+          sub(/^"/, "", line)
+          sub(/"$/, "", line)
+        }
+        print line
+        found = 1
+        exit
+      }
+    }
+    END {
+      if (!found && fallback != "") {
+        print fallback
+      }
+    }
+  ' "$CONFIG_PATH"
+}
 
-host_workspace = config.get("deployment", {}).get("host_workspace", "")
-if not host_workspace:
-    raise SystemExit("deployment.host_workspace is required")
+host_workspace="$(toml_get deployment host_workspace)"
+container_workspace="$(toml_get worker workspace /workspace)"
 
-print(host_workspace)
-PY
-)"
-
-container_workspace="$(
-  python3 - "$CONFIG_PATH" <<'PY'
-import sys
-import tomllib
-
-with open(sys.argv[1], "rb") as f:
-    config = tomllib.load(f)
-
-workspace = config.get("worker", {}).get("workspace", "/workspace")
-print(workspace)
-PY
-)"
+if [[ -z "$host_workspace" ]]; then
+  echo "deployment.host_workspace is required" >&2
+  exit 1
+fi
 
 if [[ "$host_workspace" != /* ]]; then
   echo "deployment.host_workspace must be an absolute host path: $host_workspace" >&2
