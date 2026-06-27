@@ -1,0 +1,4 @@
+starlette==0.46.2
+uvicorn==0.34.3
+sse-starlette==2.3.6
+pydantic==2.11.4

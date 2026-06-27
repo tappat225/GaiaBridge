@@ -1,0 +1,9 @@
+[master]
+host = "0.0.0.0"
+port = 9210
+heartbeat_timeout = 60
+db_path = "/app/data/registry.db"
+
+[auth]
+node_token = "<your-node-token>"
+client_token = "<your-client-token>"

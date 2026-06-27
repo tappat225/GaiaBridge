@@ -1,0 +1,4 @@
+[client]
+master_url = https://<your-domain>/wb
+client_token = <your-client-token>
+timeout = 120
