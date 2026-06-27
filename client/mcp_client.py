@@ -42,7 +42,7 @@ TOOLS = {
 # Daemon client (fast path)
 # ============================================================
 def call_via_daemon(tool, args):
-    """Send a request through the local daemon socket."""
+    """Send a request through the local daemon socket. Raises on connection failure."""
     request = json.dumps({"tool": tool, "args": args})
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.settimeout(30)
@@ -59,6 +59,9 @@ def call_via_daemon(tool, args):
                 break
     finally:
         sock.close()
+
+    if not response:
+        raise ConnectionError("daemon returned empty response")
 
     data = json.loads(response.decode("utf-8"))
     if "error" in data:
@@ -289,10 +292,14 @@ def main():
         args = {}
 
     # Try daemon first, fall back to direct
+    result = None
     if daemon_is_running():
-        result = call_via_daemon(action, args)
-    else:
-        print("(connecting directly - daemon not running)")
+        try:
+            result = call_via_daemon(action, args)
+        except (ConnectionError, TimeoutError, OSError) as e:
+            print(f"(daemon unavailable: {e}, falling back to direct)", file=sys.stderr)
+
+    if result is None:
         client = DirectClient()
         if not client.connect():
             print("error: failed to connect", file=sys.stderr)

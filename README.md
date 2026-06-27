@@ -1,12 +1,32 @@
 # WorkBridge
 
-Remote server control via MCP (Model Context Protocol). Allows an AI agent to safely operate a remote Linux server over HTTPS — execute shell commands, read/write files, and check system status.
+Multi-host remote operation and AI Agent coordination system. A central Master node manages and dispatches tasks to multiple Worker nodes over HTTPS + SSE, enabling cross-network execution without requiring inbound ports on worker machines.
 
 ## Directory Structure
 
 ```
 WorkBridge/
-├── server/                         # Server: Docker container + MCP Server
+├── shared/                         # Shared protocol and utilities
+│   ├── protocol.py                 #   Pydantic models (Node, Task, SSEEvent, enums)
+│   ├── auth.py                     #   Token generation and verification
+│   └── config.py                   #   MasterConfig / WorkerConfig schemas
+├── master/                         # Master: central control plane
+│   ├── app.py                      #   Starlette application entry point
+│   ├── registry.py                 #   Node registry (SQLite)
+│   ├── broker.py                   #   SSE connection pool manager
+│   ├── router.py                   #   Task dispatch and Future matching
+│   ├── auth.py                     #   Bearer token middleware
+│   └── api/
+│       ├── nodes.py                #   Node register/heartbeat/list/SSE
+│       └── tasks.py                #   Task dispatch/result endpoints
+├── worker/                         # Worker: execution plane
+│   ├── daemon.py                   #   Main process (register + SSE listen + reconnect)
+│   ├── reporter.py                 #   Result reporter (POST back to Master)
+│   └── executor/
+│       ├── base.py                 #   Abstract executor interface
+│       ├── shell.py                #   Shell command executor
+│       └── file.py                 #   File read/write/list executor
+├── server/                         # Legacy: single-node MCP Server (Docker)
 │   ├── server.py                   #   FastMCP application
 │   ├── Dockerfile                  #   Container image
 │   ├── docker-compose.yml          #   One-command startup
@@ -15,200 +35,170 @@ WorkBridge/
 │   └── .env.example                #   Environment variable template
 ├── client/                         # Client: CLI + Daemon
 │   ├── mcp_client.py               #   Command-line client
-│   ├── mcp_daemon.py               #   Persistent session daemon
+│   ├── mcp_daemon.py               #   Persistent MCP session daemon
 │   ├── test_nginx.py               #   End-to-end test script
 │   └── .env.example                #   Environment variable template
 ├── README.md
+├── agent.md
 └── .gitignore
 ```
 
 ## Architecture
 
 ```
-Remote AI Agent
-       │
-       ▼
-HTTPS + Bearer Token Auth (Nginx)
-       │
-       ▼
-WorkBridge MCP Server  (FastMCP, streamable-HTTP)
-  ── runs inside Docker container
-       │
-       ▼
-Host filesystem  (mounted at /workspace inside container)
+[Client / Agent]
+    | (HTTPS POST: dispatch tasks)
+    v
+[Master (public IP) -- central router]
+    ^ (HTTPS POST: report results)
+    | (SSE long-poll: push task instructions)
+    |
+    +-- [Worker @ Node A]
+    +-- [Worker @ Node B]
+    +-- [Worker @ Node C]
+    ...
 ```
 
-- **Server:** Python FastMCP app (`server/server.py`) — exposes 5 MCP tools over HTTP
-- **Daemon:** `client/mcp_daemon.py` — persistent session manager via Unix socket (avoids TLS handshake per call)
-- **Client:** `client/mcp_client.py` — CLI for ad-hoc commands; auto-detects daemon or falls back to direct HTTPS
-- **Proxy:** Nginx handles TLS termination and Bearer token validation, then forwards to the container
+### Design Constraints
 
-## Tools
+- **All-outbound connections**: Workers only need outbound HTTPS. No inbound ports required.
+- **Central routing hub**: All inter-node communication routes through Master.
+- **Capability/intelligence split**: Workers provide execution ("hands"); Agents provide LLM decision-making ("brain").
+- **Container sandbox**: All execution nodes run in restricted containers with mounted workdirs only.
 
-| Tool | What it does |
+### Components
+
+| Component | Role |
 |---|---|
-| `run_command` | Execute a shell command (timeout configurable) |
-| `read_file` | Read text from a file |
-| `write_file` | Write / overwrite a text file (creates parent dirs) |
-| `list_directory` | List directory contents with sizes |
-| `system_info` | Disk usage, memory, uptime |
+| **Master** | Node registry, SSE broker, task router, auth gateway |
+| **Worker** | Lightweight daemon that connects to Master, executes tasks, reports results |
+| **Client** | CLI tool or SDK to dispatch tasks to Master |
+| **Server (legacy)** | Single-node MCP server for direct AI agent access |
 
-All paths are **relative to the workspace root** (`/workspace` inside the container).
+## Communication Model
+
+- **Worker -> Master**: Persistent SSE connection () for receiving task pushes
+- **Worker -> Master**: HTTPS POST to report execution results
+- **Client -> Master**: HTTPS API for task dispatch and status queries
+- **Heartbeat**: Master sends SSE pings every 30s; sweeps stale nodes based on configurable timeout
+
+## API Endpoints (Master)
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST |  | Node Token | Register a worker node |
+| POST |  | Node Token | Update node heartbeat |
+| GET |  | - | List all registered nodes |
+| GET |  | Node Token | SSE event stream for a worker |
+| POST |  | Client Token | Dispatch task (async) |
+| POST |  | Client Token | Dispatch and wait for result |
+| POST |  | Node Token | Worker reports task result |
+| GET |  | - | Get task result |
+| GET |  | - | Health check |
 
 ## Quick Start
 
-### 1. Configure the server
+### Legacy single-node mode (MCP Server)
 
-```bash
-cd server/
-
-# Create real config files from templates
-cp nginx-mcp.conf.example nginx-mcp.conf
-cp .env.example .env
-
-# Edit nginx-mcp.conf: replace <your-bearer-token> with a real token
-# Edit .env: set workspace directory and timeout as needed
-```
-
-Merge the content of `nginx-mcp.conf` into your Nginx HTTPS server block.
-
-### 2. Build & run the server
+See  directory. Start with:
 
 ```bash
 cd server/
 docker compose up -d --build
 ```
 
-Server listens on `127.0.0.1:9020` (local only — exposed by Nginx).
+### Distributed mode (Master + Workers)
 
-### 3. Configure the client
-
-```bash
-cd client/
-
-# Create real config file from template
-cp .env.example .env
-
-# Edit .env: fill in your real MCP_URL and AUTH_TOKEN
-# Then load it in your shell: source .env
-```
-
-### 4. Use the CLI client
+#### 1. Start Master
 
 ```bash
-cd client/
+export MASTER_HOST=0.0.0.0
+export MASTER_PORT=8100
+export NODE_TOKEN=<your-node-token>
+export CLIENT_TOKEN=<your-client-token>
+export MASTER_DB=registry.db
+export HEARTBEAT_TIMEOUT=60
 
-# Load environment variables
-source .env
-
-# Direct HTTPS (TLS + MCP handshake on every call)
-python3 mcp_client.py write_file path/to/file.txt "content here"
-python3 mcp_client.py read_file path/to/file.txt
-python3 mcp_client.py run_command "ls -la"
-python3 mcp_client.py list_directory .
-python3 mcp_client.py system_info
-
-# Interactive shell
-python3 mcp_client.py shell
+cd WorkBridge
+python3 -m master.app
 ```
 
-### 5. Start the daemon (faster — keeps one MCP session alive)
+#### 2. Start Worker (on any node)
 
 ```bash
-cd client/
-source .env
+export NODE_ID=worker-1
+export MASTER_URL=https://<master-domain>:8100
+export NODE_TOKEN=<your-node-token>
+export WORKSPACE_DIR=/workspace
+export COMMAND_TIMEOUT=120
 
-python3 mcp_daemon.py --daemonize   # start in background
-python3 mcp_client.py write_file ... # automatically uses daemon socket
-python3 mcp_daemon.py --stop        # stop when done
+cd WorkBridge
+python3 -m worker.daemon
 ```
 
-### 6. Connect an AI agent
+#### 3. Dispatch a task (from Client)
 
-Point any MCP-compatible client to `https://<your-domain>/_mcp` with header:
-
+```bash
+curl -X POST https://<master-domain>:8100/api/tasks/dispatch_sync   -H "Authorization: Bearer <client-token>"   -H "Content-Type: application/json"   -d '{"target_node": "worker-1", "payload": {"task_type": "shell", "params": {"command": "uname -a"}}}'
 ```
-Authorization: Bearer <your-token>
-```
-
-The server follows the standard MCP JSON-RPC protocol over streamable HTTP.
 
 ## Configuration
 
-### Server (`server/.env`)
+### Master
 
 | Env var | Default | Description |
 |---|---|---|
-| `WORKSPACE_DIR` | `/workspace` | Root directory for all file operations |
-| `COMMAND_TIMEOUT` | `60` | Shell command timeout in seconds |
-| `MCP_PORT` | `8000` | Port the MCP server listens on |
-| `ALLOWED_READ_EXTENSIONS` | (all) | Comma-separated list of allowed file extensions |
+|  |  | Bind address |
+|  |  | Listen port |
+|  | (required) | Token for worker authentication |
+|  | (required) | Token for client/agent authentication |
+|  |  | Seconds before marking node offline |
+|  |  | SQLite database path |
 
-### Client (`client/.env`)
+### Worker
 
 | Env var | Default | Description |
 |---|---|---|
-| `MCP_URL` | `https://<your-domain>/_mcp` | MCP server endpoint URL |
-| `AUTH_TOKEN` | `<your-bearer-token>` | Bearer token for authentication |
-| `MCP_SOCKET_PATH` | `/tmp/mcp-daemon.sock` | Daemon Unix socket path |
-| `MCP_PID_FILE` | `/tmp/mcp-daemon.pid` | Daemon PID file path |
+|  | (required) | Unique identifier for this worker |
+|  | (required) | Master endpoint URL |
+|  | (required) | Authentication token |
+|  |  | Root directory for file operations |
+|  |  | Shell command timeout in seconds |
+|  |  | Seconds between reconnect attempts |
 
-### Nginx (`server/nginx-mcp.conf`)
+### Legacy MCP Client ()
 
-Copy `nginx-mcp.conf.example` to `nginx-mcp.conf`, replace `<your-bearer-token>` with a real token, then merge the content into your Nginx HTTPS server block.
-
-## Filesystem Mapping
-
-The container mounts the host's repo directory:
-
-```
-Host:  /home/ubuntu/repo/
-              │
-              ├── WorkBridge/       ← this project
-              ├── new-project/      ← projects you create via the agent
-              └── ...               ← anything else you put there
-              │
-              ▼  (Docker volume mount)
-Container:  /workspace/
-```
-
-**What this means in practice:** When the agent writes to `new-project/hello.txt`, the file appears at `/home/ubuntu/repo/new-project/hello.txt` on the host. The agent sees `/workspace`; you see `/home/ubuntu/repo`. Everything else is the same relative structure.
-
-## Path Resolution Rules
-
-| You send | Resolves to (in container) | Maps to (on host) |
+| Env var | Default | Description |
 |---|---|---|
-| `new-project/hello.txt` | `/workspace/new-project/hello.txt` | `/home/ubuntu/repo/new-project/hello.txt` |
-| `/workspace/new-project/hello.txt` | `/workspace/new-project/hello.txt` | `/home/ubuntu/repo/new-project/hello.txt` |
-| `/workspace/foo/bar` | `/workspace/foo/bar` | `/home/ubuntu/repo/foo/bar` |
-| `../../etc/passwd` | **denied** (path traversal) | — |
-
-**Key rule:** `/workspace` is the root of your world. Both `new-project/hello.txt` and `/workspace/new-project/hello.txt` point to the same location.
+|  |  | MCP server endpoint |
+|  | (required) | Bearer token |
+|  |  | Daemon Unix socket path |
+|  |  | Daemon PID file path |
 
 ## Security
 
-- **No hardcoded secrets** — tokens and URLs are loaded from environment variables or local config files (gitignored)
-- **Path traversal blocked** — `../` and absolute paths outside `/workspace` are rejected
-- **Bearer token required** — Nginx rejects unauthenticated requests
-- **Local-only container port** — MCP server binds to `127.0.0.1`, not exposed to the internet
-- **Non-root user** — Container runs as `mcp` user, not root
-- **Command timeout** — Long-running commands are killed automatically
+- **Dual token scheme**: Node Token (worker identity) and Client Token (dispatch authority) are separate
+- **All-outbound networking**: Workers never expose inbound ports
+- **Path traversal blocked**: All file operations enforce workspace boundary via realpath validation
+- **Container isolation**: Workers run as non-root in containers with only workspace mounted
+- **Command timeout**: Long-running commands are killed automatically
+- **No hardcoded secrets**: All tokens loaded from environment variables
 
 ## Troubleshooting
 
-### Agent wrote files but I can't find them
+### Worker cannot connect to Master
 
-Check the path you used. If you sent `/workspace/new-project/file.txt`, the file is at `/home/ubuntu/repo/new-project/file.txt` on the host — **not** `/home/ubuntu/repo/workspace/new-project/file.txt`. The `/workspace` prefix inside the container maps to `/home/ubuntu/repo` on the host.
+- Verify  is reachable: 
+- Check  matches the Master configuration
+- Ensure outbound HTTPS is not blocked by firewall
 
-### "Path traversal denied" error
+### Task dispatched but no result
 
-You tried to access a path outside `/workspace`. Use relative paths or paths starting with `/workspace/`.
+- Check if the target worker is online: 
+- Verify the worker's SSE connection is active (Master logs show "broker: node X connected")
+- Check worker logs for execution errors
 
-### Daemon won't start
+### Legacy MCP client issues
 
-Check if a stale instance is running: `python3 mcp_daemon.py --stop` then retry.
-
-### Client can't connect
-
-Make sure you've sourced the `.env` file: `source client/.env`
-Verify the env vars are set: `echo $MCP_URL`
+- Daemon timeout: client now auto-falls back to direct mode on daemon failure
+- Source  before starting daemon: 
