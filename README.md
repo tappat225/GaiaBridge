@@ -1,3 +1,5 @@
+English | [中文](README_zh.md)
+
 # WorkBridge
 
 Multi-host remote operation and AI Agent coordination system. A central Master node manages and dispatches tasks to multiple Worker nodes over HTTPS + SSE, enabling cross-network execution without requiring inbound ports on worker machines.
