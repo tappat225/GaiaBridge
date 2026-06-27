@@ -85,17 +85,11 @@ cp config.toml.example config.toml
 # Edit config.toml: set auth.node_token and auth.client_token
 # Generate tokens with: python3 -c "import secrets; print(secrets.token_hex(32))"
 
-# Build (default Docker Hub + PyPI, for foreign servers)
-DOCKER_BUILDKIT=0 docker build --network=host \
-  -t workbridge-master -f Dockerfile ..
+# Default deployment
+./deploy.sh
 
-# Build (China mirrors: Tsinghua for pip/apt)
-DOCKER_BUILDKIT=0 docker build --network=host \
-  --build-arg APT_MIRROR=mirrors.tuna.tsinghua.edu.cn \
-  --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
-  -t workbridge-master -f Dockerfile ..
-
-docker compose up -d
+# China mirrors for apt/pip
+./deploy.sh --cn
 ```
 
 Master listens on `127.0.0.1:9210`. Use Nginx to expose it over HTTPS.
@@ -135,13 +129,11 @@ cp config.toml.example config.toml
 # Use the SAME node_token from Master config
 # Set deployment.host_workspace to the absolute host path this worker may operate in
 
-# Build (same pattern as Master)
-DOCKER_BUILDKIT=0 docker build --network=host \
-  --build-arg APT_MIRROR=mirrors.tuna.tsinghua.edu.cn \
-  --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
-  -t workbridge-worker -f Dockerfile ..
+# Default deployment
+./deploy.sh
 
-docker compose up -d
+# China mirrors for apt/pip
+./deploy.sh --cn
 ```
 
 The worker connects outbound to Master and waits for tasks.
@@ -158,6 +150,7 @@ If you run Docker Compose directly, set `WORKBRIDGE_HOST_WORKSPACE` to the host
 path and keep `WORKBRIDGE_CONTAINER_WORKSPACE` aligned with `worker.workspace`:
 
 ```bash
+DOCKER_BUILDKIT=0 \
 WORKBRIDGE_HOST_WORKSPACE=/home/ubuntu/repo \
 WORKBRIDGE_CONTAINER_WORKSPACE=/workspace \
 docker compose up -d
@@ -301,8 +294,23 @@ docker-compose process. Either:
 | `PIP_INDEX_URL` | `https://pypi.org/simple` | `https://pypi.tuna.tsinghua.edu.cn/simple` |
 
 The docker-compose files read these from environment variables with
-international defaults. To switch to Chinese mirrors, export the vars
-before building or pass them as `--build-arg` to `docker build`.
+international defaults. To switch to Chinese mirrors, run either deploy script
+with `--cn`:
+
+```bash
+./deploy.sh --cn
+```
+
+That option sets:
+
+```bash
+DOCKER_BUILDKIT=0
+APT_MIRROR=mirrors.tuna.tsinghua.edu.cn
+PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+You can still override any of those values explicitly before invoking the
+script, or pass them as `--build-arg` to `docker build`.
 
 ## Security
 
