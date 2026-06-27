@@ -1,0 +1,13 @@
+services:
+  worker:
+    build:
+      context: ..
+      dockerfile: worker/Dockerfile
+    container_name: workbridge-worker
+    restart: unless-stopped
+    volumes:
+      - ${WORKSPACE_DIR:-/home/ubuntu/repo}:/workspace:rw
+    env_file:
+      - .env
+    environment:
+      - WORKSPACE_DIR=/workspace

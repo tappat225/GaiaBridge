@@ -1,0 +1,20 @@
+services:
+  master:
+    build:
+      context: ..
+      dockerfile: master/Dockerfile
+    container_name: workbridge-master
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8100:8100"
+    volumes:
+      - master-data:/app/data
+    env_file:
+      - .env
+    environment:
+      - MASTER_HOST=0.0.0.0
+      - MASTER_PORT=8100
+      - MASTER_DB=/app/data/registry.db
+
+volumes:
+  master-data:
