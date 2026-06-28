@@ -21,6 +21,7 @@ WorkBridge/
 │   ├── api/
 │   │   ├── nodes.py                #   Node register/heartbeat/list/SSE
 │   │   └── tasks.py                #   Task dispatch/result endpoints
+│   ├── deploy.py                   #   Cross-platform deploy script
 │   ├── Dockerfile                  #   Container image
 │   ├── docker-compose.yml          #   One-command startup
 │   ├── requirements.txt            #   Python dependencies
@@ -32,6 +33,7 @@ WorkBridge/
 │   │   ├── base.py                 #   Abstract executor interface
 │   │   ├── shell.py                #   Shell command executor
 │   │   └── file.py                 #   File read/write/list executor
+│   ├── deploy.py                   #   Cross-platform deploy script
 │   ├── Dockerfile                  #   Container image
 │   ├── docker-compose.yml          #   One-command startup
 │   ├── requirements.txt            #   Python dependencies
@@ -40,6 +42,7 @@ WorkBridge/
 │   ├── workbridge_client.py        #   Command-line client
 │   └── config.ini.example          #   Configuration template
 ├── README.md
+├── README_zh.md
 ├── agent.md
 └── .gitignore
 ```
@@ -86,10 +89,10 @@ cp config.toml.example config.toml
 # Generate tokens with: python3 -c "import secrets; print(secrets.token_hex(32))"
 
 # Default deployment
-./deploy.sh
+python3 deploy.py
 
 # China mirrors for apt/pip
-./deploy.sh --cn
+python3 deploy.py --cn
 ```
 
 Master listens on `127.0.0.1:9210`. Use Nginx to expose it over HTTPS.
@@ -130,10 +133,10 @@ cp config.toml.example config.toml
 # Set deployment.host_workspace to the absolute host path this worker may operate in
 
 # Default deployment
-./deploy.sh
+python3 deploy.py
 
 # China mirrors for apt/pip
-./deploy.sh --cn
+python3 deploy.py --cn
 ```
 
 The worker connects outbound to Master and waits for tasks.
@@ -143,7 +146,7 @@ reads `deployment.host_workspace` from `config.toml`, mounts that host path to
 `worker.workspace`, and starts the service:
 
 ```bash
-./deploy.sh
+python3 deploy.py
 ```
 
 If you run Docker Compose directly, set `WORKBRIDGE_HOST_WORKSPACE` to the host
@@ -232,11 +235,11 @@ file mounts `master/config.toml` there automatically.
 | `worker.workspace` | `WORKSPACE_DIR` | `/workspace` | Container workspace path used by task executors |
 | `worker.command_timeout` | `COMMAND_TIMEOUT` | `120` | Shell command timeout in seconds |
 | `worker.reconnect_interval` | `RECONNECT_INTERVAL` | `5` | Seconds between reconnect attempts |
-| `deployment.host_workspace` | - | (required by `worker/deploy.sh`) | Host path mounted into `worker.workspace` |
+| `deployment.host_workspace` | - | (required by `worker/deploy.py`) | Host path mounted into `worker.workspace` |
 
 The Worker container reads `/etc/workbridge/worker.toml`; the provided Compose
 file mounts `worker/config.toml` there automatically. When using
-`worker/deploy.sh`, `deployment.host_workspace` is injected into Docker Compose
+`worker/deploy.py`, `deployment.host_workspace` is injected into Docker Compose
 as `WORKBRIDGE_HOST_WORKSPACE` and mounted at `worker.workspace`.
 
 ### Client (`client/config.ini`)
@@ -300,7 +303,7 @@ international defaults. To switch to Chinese mirrors, run either deploy script
 with `--cn`:
 
 ```bash
-./deploy.sh --cn
+python3 deploy.py --cn
 ```
 
 That option sets:

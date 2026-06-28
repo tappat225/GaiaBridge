@@ -21,6 +21,7 @@ WorkBridge/
 │   ├── api/
 │   │   ├── nodes.py                #   节点注册/心跳/列表/SSE
 │   │   └── tasks.py                #   任务调度/结果端点
+│   ├── deploy.py                   #   跨平台部署脚本
 │   ├── Dockerfile                  #   容器镜像
 │   ├── docker-compose.yml          #   一键启动
 │   ├── requirements.txt            #   Python 依赖
@@ -32,6 +33,7 @@ WorkBridge/
 │   │   ├── base.py                 #   抽象执行器接口
 │   │   ├── shell.py                #   Shell 命令执行器
 │   │   └── file.py                 #   文件读写/列表执行器
+│   ├── deploy.py                   #   跨平台部署脚本
 │   ├── Dockerfile                  #   容器镜像
 │   ├── docker-compose.yml          #   一键启动
 │   ├── requirements.txt            #   Python 依赖
@@ -87,10 +89,10 @@ cp config.toml.example config.toml
 # 生成 token: python3 -c "import secrets; print(secrets.token_hex(32))"
 
 # 默认部署
-./deploy.sh
+python3 deploy.py
 
 # 使用国内镜像
-./deploy.sh --cn
+python3 deploy.py --cn
 ```
 
 Master 监听 `127.0.0.1:9210`，通过 Nginx 反向代理暴露 HTTPS。
@@ -131,10 +133,10 @@ cp config.toml.example config.toml
 # 设置 deployment.host_workspace 为宿主机上的绝对工作路径
 
 # 默认部署
-./deploy.sh
+python3 deploy.py
 
 # 使用国内镜像
-./deploy.sh --cn
+python3 deploy.py --cn
 ```
 
 Worker 以出站方式连接 Master 并等待任务。
@@ -142,7 +144,7 @@ Worker 以出站方式连接 Master 并等待任务。
 默认情况下，任务在容器内的 `/workspace` 下执行。部署脚本读取 `config.toml` 中的 `deployment.host_workspace`，将宿主机路径挂载到 `worker.workspace`：
 
 ```bash
-./deploy.sh
+python3 deploy.py
 ```
 
 如直接使用 Docker Compose，设置 `WORKBRIDGE_HOST_WORKSPACE` 为宿主机路径，并保持 `WORKBRIDGE_CONTAINER_WORKSPACE` 与 `worker.workspace` 一致：
@@ -226,7 +228,7 @@ Master 容器读取 `/etc/workbridge/master.toml`；Compose 文件自动挂载 `
 | `worker.workspace` | `WORKSPACE_DIR` | `/workspace` | 容器内工作目录 |
 | `worker.command_timeout` | `COMMAND_TIMEOUT` | `120` | Shell 命令超时秒数 |
 | `worker.reconnect_interval` | `RECONNECT_INTERVAL` | `5` | 重连间隔秒数 |
-| `deployment.host_workspace` | - | (`deploy.sh` 必填) | 挂载到 `worker.workspace` 的宿主机路径 |
+| `deployment.host_workspace` | - | (`deploy.py` 必填) | 挂载到 `worker.workspace` 的宿主机路径 |
 
 Worker 容器读取 `/etc/workbridge/worker.toml`；Compose 文件自动挂载 `worker/config.toml` 到该路径。
 
@@ -273,7 +275,7 @@ RUN sed -i "s|http://deb.debian.org|http://${APT_MIRROR}|g" ...
 切换国内镜像：
 
 ```bash
-./deploy.sh --cn
+python3 deploy.py --cn
 ```
 
 ## 安全
