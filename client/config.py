@@ -1,4 +1,4 @@
-"""INI configuration loader for the WorkBridge client."""
+"""INI configuration loader for the GaiaBridge client."""
 
 import configparser
 import os
@@ -8,7 +8,7 @@ from pathlib import Path
 
 @dataclass
 class ClientConfig:
-    master_url: str = "https://<your-domain>/wb"
+    master_url: str = "https://<your-domain>/gb"
     client_token: str = ""
     timeout: int = 120
 
@@ -19,13 +19,13 @@ def _env(name, fallback):
 
 
 def _candidate_paths():
-    env_path = os.environ.get("WORKBRIDGE_CLIENT_CONFIG")
+    env_path = os.environ.get("GAIABRIDGE_CLIENT_CONFIG")
     if env_path:
         yield Path(env_path).expanduser()
 
     yield Path(__file__).with_name("config.ini")
     yield Path.cwd() / "client" / "config.ini"
-    yield Path.home() / ".config" / "workbridge" / "client.ini"
+    yield Path.home() / ".config" / "gaia_bridge" / "client.ini"
 
 
 def _read_ini(path):

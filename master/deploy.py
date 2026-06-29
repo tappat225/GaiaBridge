@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cross-platform deploy script for WorkBridge master."""
+"""Cross-platform deploy script for GaiaBridge master."""
 
 import argparse
 import os
@@ -11,7 +11,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Deploy WorkBridge master")
+    parser = argparse.ArgumentParser(description="Deploy GaiaBridge master")
     parser.add_argument("--cn", action="store_true", help="Use China mirrors for apt/pip")
     args = parser.parse_args()
 

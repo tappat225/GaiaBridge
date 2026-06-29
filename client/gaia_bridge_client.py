@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""WorkBridge client: dispatch tasks to a worker through the Master API."""
+"""GaiaBridge client: dispatch tasks to a worker through the Master API."""
 
 import argparse
 import json
@@ -23,7 +23,7 @@ TOOLS = {
 }
 
 
-class WorkBridgeClient:
+class GaiaBridgeClient:
     def __init__(self, config):
         self.config = config
 
@@ -123,7 +123,7 @@ def print_nodes(nodes):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Dispatch WorkBridge tasks")
+    parser = argparse.ArgumentParser(description="Dispatch GaiaBridge tasks")
     parser.add_argument("--config", help="path to client INI config")
 
     sub = parser.add_subparsers(dest="action", required=True)
@@ -152,7 +152,7 @@ def main():
 
     args = parser.parse_args()
     config = load_client_config(args.config)
-    client = WorkBridgeClient(config)
+    client = GaiaBridgeClient(config)
 
     try:
         if args.action == "list_nodes":

@@ -1,10 +1,10 @@
-# agent.md — WorkBridge Programming Guide
+# agent.md — GaiaBridge Programming Guide
 
 > This file provides project-level context and rules for AI coding assistants (Claude, Copilot, etc.).
 
 ## Project Overview
 
-WorkBridge is a distributed multi-host remote operation and AI Agent coordination system. A central Master node manages multiple Worker nodes over HTTPS + SSE, enabling cross-network task execution.
+GaiaBridge is a distributed multi-host remote operation and AI Agent coordination system. A central Master node manages multiple Worker nodes over HTTPS + SSE, enabling cross-network task execution.
 
 | Component | Directory | Description |
 |---|---|---|
@@ -18,16 +18,9 @@ WorkBridge is a distributed multi-host remote operation and AI Agent coordinatio
 
 ### 1. Default Language — English Only
 
-**All content in this project must be in English**, including:
+All project content must be in English, including code (names, comments, docstrings), commit messages, program output, and log messages.
 
-- Variable names, function names, class names in code
-- Code comments and docstrings
-- Commit messages
-- Documentation and README
-- Program output (stdout/stderr)
-- Log messages
-
-Non-English text is prohibited in any of the above contexts, except for end-user-facing UI strings where localization is explicitly required.
+**Exception:** Documentation and README files may use other languages. End-user-facing UI strings may also use other languages when localization is explicitly required.
 
 ### 2. No Special Characters in Program Output
 
@@ -105,7 +98,7 @@ Cross-directory imports must go through `shared/`. Master and Worker must not im
 - Use `Path.resolve()` + `startswith()` check against workspace root
 - Path traversal (`../`) must be denied
 - Worker workspace defaults to `/workspace` and is configured by `worker.workspace` or the `WORKSPACE_DIR` override
-- The Docker host directory mounted at `/workspace` is controlled by `WORKBRIDGE_WORKSPACE_DIR`
+- The Docker host directory mounted at `/workspace` is controlled by `GAIABRIDGE_WORKSPACE_DIR`
 
 ### 11. Error Handling
 
@@ -165,5 +158,5 @@ Cross-directory imports must go through `shared/`. Master and Worker must not im
   for the workspace setting — NOT the host path.
 - The host-to-container mapping is handled by Docker volumes; the
   executor inside the container sees only `/workspace`.
-- `WORKBRIDGE_WORKSPACE_DIR` controls which host directory is mounted
+- `GAIABRIDGE_WORKSPACE_DIR` controls which host directory is mounted
   to `/workspace` in the worker container.

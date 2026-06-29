@@ -1,4 +1,4 @@
-"""Shared protocol definitions for WorkBridge distributed system."""
+"""Shared protocol definitions for GaiaBridge distributed system."""
 
 from __future__ import annotations
 

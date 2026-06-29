@@ -157,7 +157,7 @@ ENV/
 env.bak/
 venv.bak/
 
-# Local WorkBridge configuration
+# Local GaiaBridge configuration
 master/config.toml
 worker/config.toml
 client/config.ini
@@ -224,8 +224,9 @@ __marimo__/
 
 # AI
 .claude/
+coding_prompt/
 
-# WorkBridge — real config files (contain sensitive data)
+# GaiaBridge — real config files (contain sensitive data)
 server/nginx-mcp.conf
 server/.env
 client/.env

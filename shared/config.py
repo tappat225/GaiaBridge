@@ -39,13 +39,13 @@ def _as_int(value: Any, name: str) -> int:
 
 
 def _default_path(service: str) -> str:
-    env_name = f"WORKBRIDGE_{service.upper()}_CONFIG"
-    configured = os.environ.get("WORKBRIDGE_CONFIG", os.environ.get(env_name, ""))
+    env_name = f"GAIABRIDGE_{service.upper()}_CONFIG"
+    configured = os.environ.get("GAIABRIDGE_CONFIG", os.environ.get(env_name, ""))
     if configured:
         return configured
 
     candidates = [
-        Path("/etc/workbridge") / f"{service}.toml",
+        Path("/etc/gaia_bridge") / f"{service}.toml",
         Path(__file__).resolve().parent.parent / service / "config.toml",
     ]
     return str(next((candidate for candidate in candidates if candidate.exists()), ""))

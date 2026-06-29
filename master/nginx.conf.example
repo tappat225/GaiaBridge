@@ -1,7 +1,7 @@
-# WorkBridge Master — Nginx configuration snippet
+# GaiaBridge Master — Nginx configuration snippet
 # Merge into your HTTPS server block in /etc/nginx/sites-available/<your-domain>
 
-location /wb/ {
+location /gb/ {
     proxy_pass http://127.0.0.1:9210/;
     proxy_http_version 1.1;
     proxy_set_header Host $host;

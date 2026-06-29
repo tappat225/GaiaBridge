@@ -7,15 +7,15 @@ services:
         PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.12-slim}
         APT_MIRROR: ${APT_MIRROR:-deb.debian.org}
         PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
-    container_name: workbridge-master
-    image: workbridge-master
+    container_name: gaia-bridge-master
+    image: gaia-bridge-master
     restart: unless-stopped
     network_mode: host
     volumes:
       - master-data:/app/data
-      - ./config.toml:/etc/workbridge/master.toml:ro
+      - ./config.toml:/etc/gaia_bridge/master.toml:ro
     environment:
-      - WORKBRIDGE_CONFIG=/etc/workbridge/master.toml
+      - GAIABRIDGE_CONFIG=/etc/gaia_bridge/master.toml
 
 volumes:
   master-data:

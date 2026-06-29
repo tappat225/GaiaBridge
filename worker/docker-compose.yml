@@ -7,12 +7,12 @@ services:
         PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.12-slim}
         APT_MIRROR: ${APT_MIRROR:-deb.debian.org}
         PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
-    container_name: workbridge-worker
-    image: workbridge-worker
+    container_name: gaia-bridge-worker
+    image: gaia-bridge-worker
     restart: unless-stopped
     network_mode: host
     volumes:
-      - ${WORKBRIDGE_HOST_WORKSPACE:-/home/ubuntu/repo}:${WORKBRIDGE_CONTAINER_WORKSPACE:-/workspace}:rw
-      - ./config.toml:/etc/workbridge/worker.toml:ro
+      - ${GAIABRIDGE_HOST_WORKSPACE:-/home/ubuntu/repo}:${GAIABRIDGE_CONTAINER_WORKSPACE:-/workspace}:rw
+      - ./config.toml:/etc/gaia_bridge/worker.toml:ro
     environment:
-      - WORKBRIDGE_CONFIG=/etc/workbridge/worker.toml
+      - GAIABRIDGE_CONFIG=/etc/gaia_bridge/worker.toml

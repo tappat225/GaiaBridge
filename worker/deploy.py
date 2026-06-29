@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cross-platform deploy script for WorkBridge worker."""
+"""Cross-platform deploy script for GaiaBridge worker."""
 
 import argparse
 import os
@@ -28,13 +28,13 @@ def read_toml_value(config_path, section, key, fallback=""):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Deploy WorkBridge worker")
+    parser = argparse.ArgumentParser(description="Deploy GaiaBridge worker")
     parser.add_argument("--cn", action="store_true", help="Use China mirrors for apt/pip")
     args = parser.parse_args()
 
     os.chdir(SCRIPT_DIR)
 
-    config_path = os.environ.get("WORKBRIDGE_CONFIG_FILE", "config.toml")
+    config_path = os.environ.get("GAIABRIDGE_CONFIG_FILE", "config.toml")
     if not Path(config_path).exists():
         sys.exit(f"error: config file not found: {config_path}")
 
@@ -55,8 +55,8 @@ def main():
     host_path.mkdir(parents=True, exist_ok=True)
 
     env = os.environ.copy()
-    env["WORKBRIDGE_HOST_WORKSPACE"] = host_workspace
-    env["WORKBRIDGE_CONTAINER_WORKSPACE"] = container_workspace
+    env["GAIABRIDGE_HOST_WORKSPACE"] = host_workspace
+    env["GAIABRIDGE_CONTAINER_WORKSPACE"] = container_workspace
     env.setdefault("DOCKER_BUILDKIT", "0")
 
     if args.cn:

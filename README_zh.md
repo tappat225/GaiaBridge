@@ -1,4 +1,4 @@
-# WorkBridge
+# GaiaBridge
 
 [English](README.md) | 中文
 
@@ -7,7 +7,7 @@
 ## 目录结构
 
 ```
-WorkBridge/
+GaiaBridge/
 ├── shared/                         # 共享协议与工具
 │   ├── protocol.py                 #   Pydantic 数据模型 (Node, Task, SSEEvent, 枚举)
 │   ├── auth.py                     #   Token 生成与验证
@@ -39,7 +39,7 @@ WorkBridge/
 │   ├── requirements.txt            #   Python 依赖
 │   └── config.toml.example         #   配置模板
 ├── client/                         # Client: CLI 客户端
-│   ├── workbridge_client.py        #   命令行客户端
+│   ├── gaia_bridge_client.py        #   命令行客户端
 │   └── config.ini.example          #   配置模板
 ├── README.md
 ├── README_zh.md
@@ -102,7 +102,7 @@ Master 监听 `127.0.0.1:9210`，通过 Nginx 反向代理暴露 HTTPS。
 将以下配置合并到 HTTPS server 块中 (参见 `master/nginx.conf.example`):
 
 ```nginx
-location /wb/ {
+location /gb/ {
     proxy_pass http://127.0.0.1:9210/;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
@@ -147,12 +147,12 @@ Worker 以出站方式连接 Master 并等待任务。
 python3 deploy.py
 ```
 
-如直接使用 Docker Compose，设置 `WORKBRIDGE_HOST_WORKSPACE` 为宿主机路径，并保持 `WORKBRIDGE_CONTAINER_WORKSPACE` 与 `worker.workspace` 一致：
+如直接使用 Docker Compose，设置 `GAIABRIDGE_HOST_WORKSPACE` 为宿主机路径，并保持 `GAIABRIDGE_CONTAINER_WORKSPACE` 与 `worker.workspace` 一致：
 
 ```bash
 DOCKER_BUILDKIT=0 \
-WORKBRIDGE_HOST_WORKSPACE=/home/ubuntu/repo \
-WORKBRIDGE_CONTAINER_WORKSPACE=/workspace \
+GAIABRIDGE_HOST_WORKSPACE=/home/ubuntu/repo \
+GAIABRIDGE_CONTAINER_WORKSPACE=/workspace \
 docker compose up -d
 ```
 
@@ -169,7 +169,7 @@ master_url = "http://127.0.0.1:9210"
 
 ```bash
 # 通过 Nginx 代理 (外部客户端):
-curl -X POST https://<master-domain>/wb/api/tasks/dispatch \
+curl -X POST https://<master-domain>/gb/api/tasks/dispatch \
   -H "Authorization: Bearer <client-token>" \
   -H "Content-Type: application/json" \
   -d '{"target_node": "worker-1", "payload": {"task_type": "shell", "params": {"command": "uname -a"}}}'
@@ -216,7 +216,7 @@ curl -X POST http://127.0.0.1:9210/api/tasks/dispatch \
 | `master.heartbeat_timeout` | `HEARTBEAT_TIMEOUT` | `60` | 心跳超时秒数 |
 | `master.db_path` | `MASTER_DB` | `/app/data/registry.db` | SQLite 数据库路径 |
 
-Master 容器读取 `/etc/workbridge/master.toml`；Compose 文件自动挂载 `master/config.toml` 到该路径。
+Master 容器读取 `/etc/gaia_bridge/master.toml`；Compose 文件自动挂载 `master/config.toml` 到该路径。
 
 ### Worker (`worker/config.toml`)
 
@@ -230,15 +230,15 @@ Master 容器读取 `/etc/workbridge/master.toml`；Compose 文件自动挂载 `
 | `worker.reconnect_interval` | `RECONNECT_INTERVAL` | `5` | 重连间隔秒数 |
 | `deployment.host_workspace` | - | (`deploy.py` 必填) | 挂载到 `worker.workspace` 的宿主机路径 |
 
-Worker 容器读取 `/etc/workbridge/worker.toml`；Compose 文件自动挂载 `worker/config.toml` 到该路径。
+Worker 容器读取 `/etc/gaia_bridge/worker.toml`；Compose 文件自动挂载 `worker/config.toml` 到该路径。
 
 ### Client (`client/config.ini`)
 
-Client 使用 INI 格式以兼容旧版 Python 无需额外依赖。自动读取 `client/config.ini`，或通过 `--config` / `WORKBRIDGE_CLIENT_CONFIG` 指定路径。
+Client 使用 INI 格式以兼容旧版 Python 无需额外依赖。自动读取 `client/config.ini`，或通过 `--config` / `GAIABRIDGE_CLIENT_CONFIG` 指定路径。
 
 | INI 键 | 环境变量覆盖 | 默认值 | 描述 |
 |---|---|---|---|
-| `client.master_url` | `MASTER_URL` | `https://<your-domain>/wb` | Master API 基础 URL |
+| `client.master_url` | `MASTER_URL` | `https://<your-domain>/gb` | Master API 基础 URL |
 | `client.client_token` | `CLIENT_TOKEN` | (必填) | Client Bearer Token |
 | `client.timeout` | `CLIENT_TIMEOUT` | `120` | 同步任务超时秒数 |
 

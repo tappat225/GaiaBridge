@@ -1,13 +1,13 @@
 English | [中文](README_zh.md)
 
-# WorkBridge
+# GaiaBridge
 
 Multi-host remote operation and AI Agent coordination system. A central Master node manages and dispatches tasks to multiple Worker nodes over HTTPS + SSE, enabling cross-network execution without requiring inbound ports on worker machines.
 
 ## Directory Structure
 
 ```
-WorkBridge/
+GaiaBridge/
 ├── shared/                         # Shared protocol and utilities
 │   ├── protocol.py                 #   Pydantic models (Node, Task, SSEEvent, enums)
 │   ├── auth.py                     #   Token generation and verification
@@ -39,7 +39,7 @@ WorkBridge/
 │   ├── requirements.txt            #   Python dependencies
 │   └── config.toml.example         #   Configuration template
 ├── client/                         # Client: CLI + Daemon
-│   ├── workbridge_client.py        #   Command-line client
+│   ├── gaia_bridge_client.py        #   Command-line client
 │   └── config.ini.example          #   Configuration template
 ├── README.md
 ├── README_zh.md
@@ -102,7 +102,7 @@ Master listens on `127.0.0.1:9210`. Use Nginx to expose it over HTTPS.
 Merge the following into your HTTPS server block (see `master/nginx.conf.example`):
 
 ```nginx
-location /wb/ {
+location /gb/ {
     proxy_pass http://127.0.0.1:9210/;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
@@ -149,13 +149,13 @@ reads `deployment.host_workspace` from `config.toml`, mounts that host path to
 python3 deploy.py
 ```
 
-If you run Docker Compose directly, set `WORKBRIDGE_HOST_WORKSPACE` to the host
-path and keep `WORKBRIDGE_CONTAINER_WORKSPACE` aligned with `worker.workspace`:
+If you run Docker Compose directly, set `GAIABRIDGE_HOST_WORKSPACE` to the host
+path and keep `GAIABRIDGE_CONTAINER_WORKSPACE` aligned with `worker.workspace`:
 
 ```bash
 DOCKER_BUILDKIT=0 \
-WORKBRIDGE_HOST_WORKSPACE=/home/ubuntu/repo \
-WORKBRIDGE_CONTAINER_WORKSPACE=/workspace \
+GAIABRIDGE_HOST_WORKSPACE=/home/ubuntu/repo \
+GAIABRIDGE_CONTAINER_WORKSPACE=/workspace \
 docker compose up -d
 ```
 
@@ -173,7 +173,7 @@ master_url = "http://127.0.0.1:9210"
 
 ```bash
 # Via nginx proxy (external clients):
-curl -X POST https://<master-domain>/wb/api/tasks/dispatch \
+curl -X POST https://<master-domain>/gb/api/tasks/dispatch \
   -H "Authorization: Bearer <client-token>" \
   -H "Content-Type: application/json" \
   -d '{"target_node": "worker-1", "payload": {"task_type": "shell", "params": {"command": "uname -a"}}}'
@@ -222,7 +222,7 @@ environment variables > configuration file > defaults
 | `master.heartbeat_timeout` | `HEARTBEAT_TIMEOUT` | `60` | Seconds before marking node offline |
 | `master.db_path` | `MASTER_DB` | `/app/data/registry.db` | SQLite database path |
 
-The Master container reads `/etc/workbridge/master.toml`; the provided Compose
+The Master container reads `/etc/gaia_bridge/master.toml`; the provided Compose
 file mounts `master/config.toml` there automatically.
 
 ### Worker (`worker/config.toml`)
@@ -237,20 +237,20 @@ file mounts `master/config.toml` there automatically.
 | `worker.reconnect_interval` | `RECONNECT_INTERVAL` | `5` | Seconds between reconnect attempts |
 | `deployment.host_workspace` | - | (required by `worker/deploy.py`) | Host path mounted into `worker.workspace` |
 
-The Worker container reads `/etc/workbridge/worker.toml`; the provided Compose
+The Worker container reads `/etc/gaia_bridge/worker.toml`; the provided Compose
 file mounts `worker/config.toml` there automatically. When using
 `worker/deploy.py`, `deployment.host_workspace` is injected into Docker Compose
-as `WORKBRIDGE_HOST_WORKSPACE` and mounted at `worker.workspace`.
+as `GAIABRIDGE_HOST_WORKSPACE` and mounted at `worker.workspace`.
 
 ### Client (`client/config.ini`)
 
 The client uses INI so it can run on older Python versions without installing
 extra dependencies. It automatically reads `client/config.ini`, or a custom path
-passed with `--config` / `WORKBRIDGE_CLIENT_CONFIG`.
+passed with `--config` / `GAIABRIDGE_CLIENT_CONFIG`.
 
 | INI key | Env override | Default | Description |
 |---|---|---|---|
-| `client.master_url` | `MASTER_URL` | `https://<your-domain>/wb` | Master API base URL |
+| `client.master_url` | `MASTER_URL` | `https://<your-domain>/gb` | Master API base URL |
 | `client.client_token` | `CLIENT_TOKEN` | (required) | Client bearer token |
 | `client.timeout` | `CLIENT_TIMEOUT` | `120` | Synchronous task timeout in seconds |
 
@@ -371,7 +371,7 @@ cd <project-root>
 DOCKER_BUILDKIT=0 docker build --no-cache --network=host \
   --build-arg APT_MIRROR=mirrors.tuna.tsinghua.edu.cn \
   --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
-  -t workbridge-master -f master/Dockerfile .
+  -t gaia-bridge-master -f master/Dockerfile .
 cd master/ && docker compose up -d
 # Repeat for worker/
 ```
