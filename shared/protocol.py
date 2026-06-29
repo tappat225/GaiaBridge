@@ -44,6 +44,7 @@ class NodeInfo(BaseModel):
     node_id: str
     hostname: str
     os: str = "linux"
+    mode: str = "container"
     capabilities: list[str] = Field(default_factory=lambda: ["shell", "file"])
     workspace: str = "/workspace"
     status: NodeStatus = NodeStatus.online
@@ -55,6 +56,7 @@ class NodeRegisterRequest(BaseModel):
     node_id: str
     hostname: str
     os: str = "linux"
+    mode: str = "container"
     capabilities: list[str] = Field(default_factory=lambda: ["shell", "file"])
     workspace: str = "/workspace"
 

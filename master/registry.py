@@ -26,6 +26,7 @@ class Registry:
                     node_id TEXT PRIMARY KEY,
                     hostname TEXT NOT NULL,
                     os TEXT DEFAULT 'linux',
+                    mode TEXT DEFAULT 'container',
                     capabilities TEXT DEFAULT 'shell,file',
                     workspace TEXT DEFAULT '/workspace',
                     status TEXT DEFAULT 'online',
@@ -33,20 +34,24 @@ class Registry:
                     registered_at TEXT
                 )
             """)
+            columns = {row["name"] for row in conn.execute("PRAGMA table_info(nodes)").fetchall()}
+            if "mode" not in columns:
+                conn.execute("ALTER TABLE nodes ADD COLUMN mode TEXT DEFAULT 'container'")
 
     def register(self, node_id: str, hostname: str, os_name: str = "linux",
-                 capabilities: list[str] = None, workspace: str = "/workspace") -> NodeInfo:
+                 mode: str = "container", capabilities: list[str] = None,
+                 workspace: str = "/workspace") -> NodeInfo:
         now = datetime.utcnow().isoformat()
         caps = ",".join(capabilities or ["shell", "file"])
         with self._lock, self._conn() as conn:
             conn.execute("""
-                INSERT INTO nodes (node_id, hostname, os, capabilities, workspace, status, last_heartbeat, registered_at)
-                VALUES (?, ?, ?, ?, ?, 'online', ?, ?)
+                INSERT INTO nodes (node_id, hostname, os, mode, capabilities, workspace, status, last_heartbeat, registered_at)
+                VALUES (?, ?, ?, ?, ?, ?, 'online', ?, ?)
                 ON CONFLICT(node_id) DO UPDATE SET
-                    hostname=excluded.hostname, os=excluded.os,
+                    hostname=excluded.hostname, os=excluded.os, mode=excluded.mode,
                     capabilities=excluded.capabilities, workspace=excluded.workspace,
                     status='online', last_heartbeat=excluded.last_heartbeat
-            """, (node_id, hostname, os_name, caps, workspace, now, now))
+            """, (node_id, hostname, os_name, mode, caps, workspace, now, now))
         return self.get(node_id)
 
     def heartbeat(self, node_id: str) -> bool:
@@ -64,6 +69,7 @@ class Registry:
             return None
         return NodeInfo(
             node_id=row["node_id"], hostname=row["hostname"], os=row["os"],
+            mode=row["mode"],
             capabilities=row["capabilities"].split(","),
             workspace=row["workspace"], status=NodeStatus(row["status"]),
             last_heartbeat=datetime.fromisoformat(row["last_heartbeat"]) if row["last_heartbeat"] else None,

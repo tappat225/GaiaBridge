@@ -45,6 +45,7 @@ def _default_path(service: str) -> str:
         return configured
 
     candidates = [
+        Path.home() / ".gaia_bridge" / service / "config.toml",
         Path("/etc/gaia_bridge") / f"{service}.toml",
         Path(__file__).resolve().parent.parent / service / "config.toml",
     ]
@@ -58,7 +59,7 @@ class MasterConfig:
     node_token: str = ""
     client_token: str = ""
     heartbeat_timeout: int = 60
-    db_path: str = "registry.db"
+    db_path: str = "/app/data/registry.db"
 
     @classmethod
     def load(cls, path: str | os.PathLike[str] | None = None) -> "MasterConfig":
@@ -81,6 +82,7 @@ class MasterConfig:
 
 @dataclass
 class WorkerConfig:
+    mode: str = "container"   # "host" | "container"
     node_id: str = ""
     master_url: str = "https://localhost:9210"
     node_token: str = ""
@@ -95,6 +97,7 @@ class WorkerConfig:
         auth = data.get("auth", {})
 
         return cls(
+            mode=str(_env("WORKER_MODE", worker.get("mode", cls.mode))),
             node_id=str(_env("NODE_ID", worker.get("node_id", cls.node_id))),
             master_url=str(_env("MASTER_URL", worker.get("master_url", cls.master_url))),
             node_token=str(_env("NODE_TOKEN", auth.get("node_token", cls.node_token))),

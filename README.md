@@ -8,6 +8,7 @@ Multi-host remote operation and AI Agent coordination system. A central Master n
 
 ```
 GaiaBridge/
+├── deploy.py                       # Unified interactive deploy script (menu-driven)
 ├── shared/                         # Shared protocol and utilities
 │   ├── protocol.py                 #   Pydantic models (Node, Task, SSEEvent, enums)
 │   ├── auth.py                     #   Token generation and verification
@@ -21,7 +22,6 @@ GaiaBridge/
 │   ├── api/
 │   │   ├── nodes.py                #   Node register/heartbeat/list/SSE
 │   │   └── tasks.py                #   Task dispatch/result endpoints
-│   ├── deploy.py                   #   Cross-platform deploy script
 │   ├── Dockerfile                  #   Container image
 │   ├── docker-compose.yml          #   One-command startup
 │   ├── requirements.txt            #   Python dependencies
@@ -33,7 +33,6 @@ GaiaBridge/
 │   │   ├── base.py                 #   Abstract executor interface
 │   │   ├── shell.py                #   Shell command executor
 │   │   └── file.py                 #   File read/write/list executor
-│   ├── deploy.py                   #   Cross-platform deploy script
 │   ├── Dockerfile                  #   Container image
 │   ├── docker-compose.yml          #   One-command startup
 │   ├── requirements.txt            #   Python dependencies
@@ -68,7 +67,9 @@ GaiaBridge/
 - **All-outbound connections**: Workers only need outbound HTTPS. No inbound ports required.
 - **Central routing hub**: All inter-node communication routes through Master.
 - **Capability/intelligence split**: Workers provide execution; Agents provide LLM decisions.
-- **Container sandbox**: All nodes run in Docker with restricted filesystem access.
+- **Dual deployment modes**: Workers support container (Docker) and host
+  (native) deployment. Container mode bind-mounts a selected host directory as
+  the worker workspace; host mode runs commands directly on the host system.
 
 ### Components
 
@@ -80,22 +81,44 @@ GaiaBridge/
 
 ## Quick Start
 
-### 1. Deploy Master (on public IP server)
+### 1. Deploy
 
 ```bash
-cd master/
-cp config.toml.example config.toml
-# Edit config.toml: set auth.node_token and auth.client_token
-# Generate tokens with: python3 -c "import secrets; print(secrets.token_hex(32))"
-
-# Default deployment
+cd GaiaBridge/
 python3 deploy.py
+```
 
-# China mirrors for apt/pip
-python3 deploy.py --cn
+The unified deploy script is entirely menu-driven — no command-line arguments
+required. It guides you through configuration for Master, Worker, or both.
+
+#### Master (central control plane)
+
+Master always deploys in container mode (Docker). The script will prompt for:
+
+- Bind address and port
+- Authentication tokens (auto-generate or enter manually)
+- Mirror selection (international or China mirrors)
+
+Configuration and persistent data are stored under `~/.gaia_bridge/master/`:
+
+```
+~/.gaia_bridge/master/
+├── config.toml    # Master configuration
+└── data/          # SQLite database (registry.db)
 ```
 
 Master listens on `127.0.0.1:9210`. Use Nginx to expose it over HTTPS.
+
+#### Worker (execution node)
+
+Worker supports two deployment modes:
+
+- **Container mode** — Docker sandbox with a selected host directory mounted as
+  `/workspace`. Best for shared servers and workloads that should only access a
+  bounded workspace.
+- **Host mode** — runs natively as a Linux systemd user service or a Windows
+  Scheduled Task, with commands executed on the host system. Best for trusted
+  personal machines.
 
 ### 2. Configure Nginx
 
@@ -123,53 +146,18 @@ location /gb/ {
 
 Then reload: `sudo nginx -t && sudo systemctl reload nginx`
 
-### 3. Deploy Worker (on any node)
+### 3. Same-machine Master + Worker
 
-```bash
-cd worker/
-cp config.toml.example config.toml
-# Edit config.toml: set worker.node_id, worker.master_url, and auth.node_token
-# Use the SAME node_token from Master config
-# Set deployment.host_workspace to the absolute host path this worker may operate in
-
-# Default deployment
-python3 deploy.py
-
-# China mirrors for apt/pip
-python3 deploy.py --cn
-```
-
-The worker connects outbound to Master and waits for tasks.
-
-By default, tasks run inside the container under `/workspace`. The helper script
-reads `deployment.host_workspace` from `config.toml`, mounts that host path to
-`worker.workspace`, and starts the service:
-
-```bash
-python3 deploy.py
-```
-
-If you run Docker Compose directly, set `GAIABRIDGE_HOST_WORKSPACE` to the host
-path and keep `GAIABRIDGE_CONTAINER_WORKSPACE` aligned with `worker.workspace`:
-
-```bash
-DOCKER_BUILDKIT=0 \
-GAIABRIDGE_HOST_WORKSPACE=/home/ubuntu/repo \
-GAIABRIDGE_CONTAINER_WORKSPACE=/workspace \
-docker compose up -d
-```
-
-### 4. Same-machine Master + Worker
-
-When Master and Worker run on the same host, point the Worker directly
-at localhost to avoid network path issues with SSE streaming:
+When Master and Worker run on the same host, choose "Both" in the deploy menu.
+The script deploys Master first, then Worker. Point the Worker directly at
+localhost to avoid network path issues with SSE streaming:
 
 ```toml
 # worker/config.toml
 master_url = "http://127.0.0.1:9210"
 ```
 
-### 5. Dispatch a task
+### 4. Dispatch a task
 
 ```bash
 # Via nginx proxy (external clients):
@@ -220,27 +208,44 @@ environment variables > configuration file > defaults
 | `auth.node_token` | `NODE_TOKEN` | (required) | Token for worker authentication |
 | `auth.client_token` | `CLIENT_TOKEN` | (required) | Token for client/agent authentication |
 | `master.heartbeat_timeout` | `HEARTBEAT_TIMEOUT` | `60` | Seconds before marking node offline |
-| `master.db_path` | `MASTER_DB` | `/app/data/registry.db` | SQLite database path |
+| `master.db_path` | `MASTER_DB` | `/app/data/registry.db` | SQLite database path (container-side) |
 
-The Master container reads `/etc/gaia_bridge/master.toml`; the provided Compose
-file mounts `master/config.toml` there automatically.
+The Master container reads `/etc/gaia_bridge/master.toml` at runtime. The
+Compose file mounts the host config and data directories from
+`~/.gaia_bridge/master/` into the container (paths are set via
+`GAIABRIDGE_MASTER_CONFIG` and `GAIABRIDGE_MASTER_DATA` environment
+variables).
 
 ### Worker (`worker/config.toml`)
 
 | TOML key | Env override | Default | Description |
 |---|---|---|---|
+| `worker.mode` | `WORKER_MODE` | `container` | Deployment mode: `"host"` or `"container"` |
 | `worker.node_id` | `NODE_ID` | (required) | Unique identifier for this worker |
 | `worker.master_url` | `MASTER_URL` | `https://localhost:9210` | Master endpoint URL |
 | `auth.node_token` | `NODE_TOKEN` | (required) | Authentication token (must match Master) |
-| `worker.workspace` | `WORKSPACE_DIR` | `/workspace` | Container workspace path used by task executors |
+| `worker.workspace` | `WORKSPACE_DIR` | `/workspace` | Workspace path (container: `/workspace`; host: `~/gaia_bridge_workspace`) |
 | `worker.command_timeout` | `COMMAND_TIMEOUT` | `120` | Shell command timeout in seconds |
 | `worker.reconnect_interval` | `RECONNECT_INTERVAL` | `5` | Seconds between reconnect attempts |
-| `deployment.host_workspace` | - | (required by `worker/deploy.py`) | Host path mounted into `worker.workspace` |
+
+Config file locations (resolved in order of priority):
+
+1. `$GAIABRIDGE_CONFIG` environment variable
+2. `~/.gaia_bridge/worker/config.toml` (host mode default)
+3. `/etc/gaia_bridge/worker.toml` (container mode default)
+4. `worker/config.toml` (dev mode fallback)
 
 The Worker container reads `/etc/gaia_bridge/worker.toml`; the provided Compose
-file mounts `worker/config.toml` there automatically. When using
-`worker/deploy.py`, `deployment.host_workspace` is injected into Docker Compose
-as `GAIABRIDGE_HOST_WORKSPACE` and mounted at `worker.workspace`.
+file mounts the config from `~/.gaia_bridge/worker/config.toml` when deployed
+through the root deploy script. In container mode, the host workspace selected
+during deployment is mounted into the container at `worker.workspace`.
+For example, to expose `/home/ubuntu/repo` to tasks, keep
+`worker.workspace = "/workspace"` and enter `/home/ubuntu/repo` when the deploy
+script asks for the host directory to mount.
+
+Host mode installs a stable application copy under `~/.gaia_bridge/worker/app`
+and runs it through `~/.gaia_bridge/worker/venv`. This keeps the deployed worker
+independent from the source checkout path after deployment.
 
 ### Client (`client/config.ini`)
 
@@ -299,14 +304,14 @@ docker-compose process. Either:
 | `PIP_INDEX_URL` | `https://pypi.org/simple` | `https://pypi.tuna.tsinghua.edu.cn/simple` |
 
 The docker-compose files read these from environment variables with
-international defaults. To switch to Chinese mirrors, run either deploy script
-with `--cn`:
+international defaults. To switch to Chinese mirrors, answer "yes" when the
+deploy script asks about mirror selection:
 
-```bash
-python3 deploy.py --cn
+```
+Use China mirrors (tuna.tsinghua.edu.cn)? [Y/n]:
 ```
 
-That option sets:
+Selecting China mirrors sets:
 
 ```bash
 DOCKER_BUILDKIT=0
@@ -353,7 +358,10 @@ See "ARG scoping" in the Build System section above.
 
 - Check if the target worker is online: `GET /api/nodes`
 - Verify the worker SSE connection is active (Master logs show "broker: node X connected")
-- Check worker logs: `docker compose logs worker`
+- Check worker logs:
+  - Container mode: `docker compose logs worker`
+  - Linux host mode: `journalctl --user -u gaia-bridge-worker -f`
+  - Windows host mode: `schtasks /Query /TN GaiaBridgeWorker`
 - **SSE line-ending mismatch**: `sse-starlette` sends events separated by
   `\r\n\r\n` (CRLF, per the SSE spec). If the worker splits the stream by
   `\n\n` (LF only), events will never be parsed. The daemon must use
