@@ -6,9 +6,26 @@ from pathlib import Path
 from typing import Any
 
 try:
+    import pwd
+    _HAS_PWD = True
+except ImportError:
+    _HAS_PWD = False
+
+try:
     import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10 and older fallback
-    tomllib = None
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10 and older
+    try:
+        import tomli as tomllib
+    except ImportError:
+        tomllib = None
+
+
+def _get_user_home() -> Path:
+    """Return the real user's home directory, even when running under sudo."""
+    sudo_user = os.environ.get("SUDO_USER")
+    if sudo_user and _HAS_PWD:
+        return Path(pwd.getpwnam(sudo_user).pw_dir)
+    return Path.home()
 
 
 def _read_toml(path: str | os.PathLike[str] | None) -> dict[str, Any]:
@@ -45,7 +62,7 @@ def _default_path(service: str) -> str:
         return configured
 
     candidates = [
-        Path.home() / ".gaia_bridge" / service / "config.toml",
+        _get_user_home() / ".gaia_bridge" / service / "config.toml",
         Path("/etc/gaia_bridge") / f"{service}.toml",
         Path(__file__).resolve().parent.parent / service / "config.toml",
     ]

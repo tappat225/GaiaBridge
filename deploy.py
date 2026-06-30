@@ -14,6 +14,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+try:
+    import pwd
+    _HAS_PWD = True
+except ImportError:
+    _HAS_PWD = False
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 APP_DIR_NAMES = ("shared", "worker")
 WORKER_SERVICE_NAME = "gaia-bridge-worker"
@@ -59,6 +65,20 @@ def _ask_choice(prompt: str, options: list[str]) -> int:
         except ValueError:
             pass
         print(f"Please enter a number between 1 and {len(options)}.")
+
+
+def _get_user_home() -> Path:
+    """Return the real user's home directory, even when running under sudo.
+
+    When deploy.py is invoked with ``sudo``, ``Path.home()`` resolves to
+    ``/root`` because the effective user is root.  This helper checks the
+    ``SUDO_USER`` environment variable and, when present, returns the
+    original user's home directory instead.
+    """
+    sudo_user = os.environ.get("SUDO_USER")
+    if sudo_user and _HAS_PWD:
+        return Path(pwd.getpwnam(sudo_user).pw_dir)
+    return Path.home()
 
 
 def _generate_token() -> str:
@@ -263,6 +283,48 @@ def _write_windows_launcher(gaia_dir: Path, app_dir: Path, config_path: Path, ve
     return launcher_path
 
 
+def _print_nginx_guide(port: int, path_prefix: str = "/gb") -> None:
+    """Print an nginx reverse-proxy configuration guide after deploy."""
+    print()
+    print("=" * 60)
+    print("  Exposing Master via HTTPS with nginx")
+    print("=" * 60)
+    print(f"""
+The Master listens on 0.0.0.0:{port} (HTTP only).
+To expose it securely under a domain, add a reverse-proxy
+location block to your nginx site config:
+
+    # --- Add this inside your HTTPS server block ---
+    location {path_prefix}/ {{
+        proxy_pass http://127.0.0.1:{port}/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # SSE support -- buffering MUST be disabled
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+
+        # Future WebSocket upgrade
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }}
+
+After editing, apply the change:
+
+    sudo nginx -t && sudo nginx -s reload
+
+Your Master will then be reachable at:
+    https://<your-domain>{path_prefix}/health
+""")
+    print("=" * 60)
+    print()
+
+
 # ---------------------------------------------------------------------------
 # master deployment (container only)
 # ---------------------------------------------------------------------------
@@ -306,7 +368,7 @@ def _deploy_master_interactive(env: dict[str, str]) -> int:
     use_cn = _ask_yn("Use China mirrors (tuna.tsinghua.edu.cn)?")
 
     # Resolve paths under ~/.gaia_bridge/
-    gaia_home = Path.home() / ".gaia_bridge"
+    gaia_home = _get_user_home() / ".gaia_bridge"
     master_config_dir = gaia_home / "master"
     master_data_dir = master_config_dir / "data"
 
@@ -365,6 +427,7 @@ def _deploy_master_interactive(env: dict[str, str]) -> int:
         print(f"  Node token:  {node_token}")
         print(f"  Client token: {client_token}")
         print("  Keep these tokens - workers and clients need them to connect.")
+        _print_nginx_guide(int(port))
     else:
         print("Master deployment failed. Check docker compose output above.")
     return ret
@@ -381,7 +444,7 @@ def _deploy_worker_container(env: dict[str, str], node_id: str, master_url: str,
     worker_dir = SCRIPT_DIR / "worker"
 
     # Write worker config to ~/.gaia_bridge/worker/config.toml
-    config_dir = Path.home() / ".gaia_bridge" / "worker"
+    config_dir = _get_user_home() / ".gaia_bridge" / "worker"
     config_dir.mkdir(parents=True, exist_ok=True)
     config_path = config_dir / "config.toml"
     _write_toml(config_path, {
@@ -431,7 +494,7 @@ def _deploy_worker_host(node_id: str, master_url: str, node_token: str,
         print("Host mode service deployment currently supports Linux and Windows only.")
         return 1
 
-    gaia_dir = Path.home() / ".gaia_bridge" / "worker"
+    gaia_dir = _get_user_home() / ".gaia_bridge" / "worker"
     gaia_dir.mkdir(parents=True, exist_ok=True)
     app_dir = gaia_dir / "app"
 
@@ -527,7 +590,7 @@ StandardError=journal
 WantedBy=default.target
 """
 
-    systemd_dir = systemd_dir or Path.home() / ".config" / "systemd" / "user"
+    systemd_dir = systemd_dir or _get_user_home() / ".config" / "systemd" / "user"
     systemd_dir.mkdir(parents=True, exist_ok=True)
     unit_path = systemd_dir / f"{WORKER_SERVICE_NAME}.service"
     unit_path.write_text(unit, encoding="utf-8")
@@ -594,14 +657,14 @@ def _deploy_worker_interactive(env: dict[str, str]) -> int:
     if mode == "container":
         print("--- Workspace (Container Mode) ---")
         container_ws = _ask("Container workspace path", "/workspace")
-        default_host_ws = str(Path.home() / ".gaia_bridge" / "workspace")
+        default_host_ws = str(_get_user_home() / ".gaia_bridge" / "workspace")
         host_ws = _ask("Host directory to mount", default_host_ws)
         command_timeout = "120"
         reconnect_interval = "5"
         workspace_for_config = container_ws
     else:
         print("--- Workspace (Host Mode) ---")
-        workspace_for_config = _ask("Workspace directory", str(Path.home() / "gaia_bridge_workspace"))
+        workspace_for_config = _ask("Workspace directory", str(_get_user_home() / "gaia_bridge_workspace"))
         host_ws = workspace_for_config  # not used in host mode, but keep variable clean
         container_ws = "/workspace"      # ditto
         command_timeout = _ask("Command timeout (s)", "120")
@@ -611,7 +674,7 @@ def _deploy_worker_interactive(env: dict[str, str]) -> int:
     use_cn = _ask_yn("Use China mirrors for pip?")
 
     # Config location: both modes now use ~/.gaia_bridge/worker/
-    config_location = str(Path.home() / ".gaia_bridge" / "worker" / "config.toml")
+    config_location = str(_get_user_home() / ".gaia_bridge" / "worker" / "config.toml")
 
     print()
     print("--- Review ---")
