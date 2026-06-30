@@ -22,7 +22,7 @@ def create_routes(registry, broker, node_token: str) -> list[Route]:
         req = NodeRegisterRequest(**body)
         node = registry.register(
             node_id=req.node_id, hostname=req.hostname,
-            os_name=req.os, capabilities=req.capabilities,
+            os_name=req.os, mode=req.mode, capabilities=req.capabilities,
             workspace=req.workspace)
         return JSONResponse(node.model_dump(mode="json"))
 

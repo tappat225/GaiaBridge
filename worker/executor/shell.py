@@ -17,8 +17,6 @@ class ShellExecutor(BaseExecutor):
         cwd = params.get("cwd", ".")
 
         work_dir = (self._workspace / cwd).resolve()
-        if not str(work_dir).startswith(str(self._workspace)):
-            return ExecResult(success=False, error="path traversal denied")
         work_dir.mkdir(parents=True, exist_ok=True)
 
         try:

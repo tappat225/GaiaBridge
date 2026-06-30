@@ -6,9 +6,26 @@ from pathlib import Path
 from typing import Any
 
 try:
+    import pwd
+    _HAS_PWD = True
+except ImportError:
+    _HAS_PWD = False
+
+try:
     import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10 and older fallback
-    tomllib = None
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10 and older
+    try:
+        import tomli as tomllib
+    except ImportError:
+        tomllib = None
+
+
+def _get_user_home() -> Path:
+    """Return the real user's home directory, even when running under sudo."""
+    sudo_user = os.environ.get("SUDO_USER")
+    if sudo_user and _HAS_PWD:
+        return Path(pwd.getpwnam(sudo_user).pw_dir)
+    return Path.home()
 
 
 def _read_toml(path: str | os.PathLike[str] | None) -> dict[str, Any]:
@@ -45,6 +62,7 @@ def _default_path(service: str) -> str:
         return configured
 
     candidates = [
+        _get_user_home() / ".gaia_bridge" / service / "config.toml",
         Path("/etc/gaia_bridge") / f"{service}.toml",
         Path(__file__).resolve().parent.parent / service / "config.toml",
     ]
@@ -58,7 +76,7 @@ class MasterConfig:
     node_token: str = ""
     client_token: str = ""
     heartbeat_timeout: int = 60
-    db_path: str = "registry.db"
+    db_path: str = "/app/data/registry.db"
 
     @classmethod
     def load(cls, path: str | os.PathLike[str] | None = None) -> "MasterConfig":
@@ -81,6 +99,7 @@ class MasterConfig:
 
 @dataclass
 class WorkerConfig:
+    mode: str = "container"   # "host" | "container"
     node_id: str = ""
     master_url: str = "https://localhost:9210"
     node_token: str = ""
@@ -95,6 +114,7 @@ class WorkerConfig:
         auth = data.get("auth", {})
 
         return cls(
+            mode=str(_env("WORKER_MODE", worker.get("mode", cls.mode))),
             node_id=str(_env("NODE_ID", worker.get("node_id", cls.node_id))),
             master_url=str(_env("MASTER_URL", worker.get("master_url", cls.master_url))),
             node_token=str(_env("NODE_TOKEN", auth.get("node_token", cls.node_token))),

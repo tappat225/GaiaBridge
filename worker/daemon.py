@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 class WorkerDaemon:
     def __init__(self, config: WorkerConfig = None):
         self._config = config or load_worker_config()
+        self._mode = self._config.mode
         self._shell = ShellExecutor(self._config.workspace, self._config.command_timeout)
         self._file = FileExecutor(self._config.workspace)
         self._reporter = Reporter(self._config.master_url, self._config.node_token)
@@ -32,15 +33,17 @@ class WorkerDaemon:
 
     def _register(self):
         url = self._config.master_url.rstrip("/") + "/api/nodes/register"
+        capabilities = ["shell", "file"]
         data = {
             "node_id": self._config.node_id,
             "hostname": platform.node(),
             "os": platform.system().lower(),
-            "capabilities": ["shell", "file"],
+            "capabilities": capabilities,
             "workspace": self._config.workspace,
+            "mode": self._mode,
         }
         resp = httpx.post(url, json=data, headers=self._headers(), timeout=15)
-        logger.info("worker: registered as %s", self._config.node_id)
+        logger.info("worker: registered as %s (mode=%s)", self._config.node_id, self._mode)
         return resp.status_code == 200
 
     async def _handle_task(self, task_data: dict):
@@ -111,6 +114,10 @@ class WorkerDaemon:
 
     async def run(self):
         self._running = True
+        logger.info("worker: starting daemon (mode=%s, node_id=%s)", self._mode, self._config.node_id)
+
+        if self._mode == "host":
+            logger.info("worker: host mode active - commands run on the host system")
         self._register()
 
         while self._running:

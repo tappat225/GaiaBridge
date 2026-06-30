@@ -1,12 +1,10 @@
 [worker]
+mode = "container"            # "host" | "container" deployment mode
 node_id = "<unique-node-id>"
 master_url = "https://<master-domain>:9210"
-workspace = "/workspace"
+workspace = "/workspace"      # container: path inside container; host: "/" (full filesystem)
 command_timeout = 120
 reconnect_interval = 5
-
-[deployment]
-host_workspace = "/home/ubuntu/repo"
 
 [auth]
 node_token = "<your-node-token>"

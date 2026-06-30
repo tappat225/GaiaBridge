@@ -12,10 +12,7 @@ services:
     restart: unless-stopped
     network_mode: host
     volumes:
-      - master-data:/app/data
-      - ./config.toml:/etc/gaia_bridge/master.toml:ro
+      - ${GAIABRIDGE_MASTER_DATA:-./data}:/app/data
+      - ${GAIABRIDGE_MASTER_CONFIG:-./config.toml}:/etc/gaia_bridge/master.toml:ro
     environment:
       - GAIABRIDGE_CONFIG=/etc/gaia_bridge/master.toml
-
-volumes:
-  master-data:

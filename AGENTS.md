@@ -94,11 +94,13 @@ Cross-directory imports must go through `shared/`. Master and Worker must not im
 
 ### 10. Path Security
 
-- All file operations in executors must validate paths against workspace boundary
-- Use `Path.resolve()` + `startswith()` check against workspace root
-- Path traversal (`../`) must be denied
-- Worker workspace defaults to `/workspace` and is configured by `worker.workspace` or the `WORKSPACE_DIR` override
-- The Docker host directory mounted at `/workspace` is controlled by `GAIABRIDGE_WORKSPACE_DIR`
+- **Container mode**: filesystem isolation is provided by Docker namespace boundaries
+- **Host mode**: the worker has full host filesystem access; security is enforced
+  at the tool-calling / Master layer rather than at the filesystem level
+- Worker workspace is configured by `worker.workspace` or the `WORKSPACE_DIR`
+  override. In container mode it defaults to `/workspace`; in host mode to `/`.
+- The Docker host directory mounted at `/workspace` is controlled by
+  `GAIABRIDGE_HOST_WORKSPACE`
 
 ### 11. Error Handling
 
@@ -154,9 +156,46 @@ Cross-directory imports must go through `shared/`. Master and Worker must not im
 
 ### 16. Workspace
 
-- Worker `config.toml` must use the **container path** (`/workspace`)
-  for the workspace setting — NOT the host path.
-- The host-to-container mapping is handled by Docker volumes; the
-  executor inside the container sees only `/workspace`.
-- `GAIABRIDGE_WORKSPACE_DIR` controls which host directory is mounted
-  to `/workspace` in the worker container.
+- The workspace setting is a base directory for resolving relative task
+  paths — it is not a security boundary.
+- In **container mode**, Worker `config.toml` must use the container path
+  (`/workspace`) for the workspace setting — NOT the host path. The
+  user-selected host workspace is bind-mounted into that container path.
+  Docker provides real filesystem isolation.
+- In **host mode**, workspace is set to `/` (full host filesystem access).
+  Security is enforced at the Master / tool-calling layer.
+- `GAIABRIDGE_HOST_WORKSPACE` (env) controls which host directory is
+  mounted to `/workspace` in the worker container (container mode only).
+
+### 17. Deployment
+
+- Root `deploy.py` is the single entry point for all deployments. It is
+  entirely menu-driven — zero CLI arguments.
+- Old `master/deploy.py` and `worker/deploy.py` are removed.
+- Master deploys in container mode only (Docker). Worker supports both
+  container and host modes.
+- Host mode Worker deploys as a Linux systemd user service or a Windows
+  Scheduled Task. Config is written to
+  `~/.gaia_bridge/worker/config.toml`.
+- Config directory `~/.gaia_bridge/` is cross-platform (Linux, macOS,
+  Windows) and is the **canonical home for all persistent data**:
+  ```
+  ~/.gaia_bridge/
+  ├── master/
+  │   ├── config.toml         # Master configuration
+  │   └── data/               # SQLite database + other persistent data
+  ├── worker/
+  │   ├── config.toml         # Worker configuration
+  │   ├── app/                # Host-mode deployed application copy
+  │   ├── bin/                # Host-mode launcher scripts
+  │   ├── logs/               # Host-mode worker logs
+  │   └── venv/               # Host-mode Python virtual environment
+  └── workspace/              # Host-mode default workspace
+  ```
+- Docker containers mount config and data paths from `~/.gaia_bridge/` via environment
+  variables (`GAIABRIDGE_MASTER_CONFIG`, `GAIABRIDGE_MASTER_DATA`,
+  `GAIABRIDGE_WORKER_CONFIG`). Worker container mode mounts the
+  user-selected host workspace via `GAIABRIDGE_HOST_WORKSPACE`. The
+  docker-compose files accept these env vars for the host-side paths
+  while the container-side paths stay fixed (`/etc/gaia_bridge/`,
+  `/app/data/`, `/workspace`).
