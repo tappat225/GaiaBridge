@@ -4,48 +4,6 @@
 
 多主机远程操作与 AI Agent 协调系统。中央 Master 节点通过 HTTPS + SSE 管理并调度任务至多个 Worker 节点，实现跨网络执行，Worker 无需开放入站端口。
 
-## 目录结构
-
-```
-GaiaBridge/
-├── deploy.py                       # 统一交互式部署脚本 (菜单驱动)
-├── shared/                         # 共享协议与工具
-│   ├── protocol.py                 #   Pydantic 数据模型 (Node, Task, SSEEvent, 枚举)
-│   ├── auth.py                     #   Token 生成与验证
-│   └── config.py                   #   MasterConfig / WorkerConfig 配置模式
-├── master/                         # Master: 中央控制面
-│   ├── app.py                      #   Starlette 应用入口
-│   ├── registry.py                 #   节点注册表 (SQLite)
-│   ├── broker.py                   #   SSE 连接池管理器
-│   ├── router.py                   #   任务调度与 Future 匹配
-│   ├── auth.py                     #   Bearer Token 中间件
-│   ├── api/
-│   │   ├── nodes.py                #   节点注册/心跳/列表/SSE
-│   │   └── tasks.py                #   任务调度/结果端点
-│   ├── Dockerfile                  #   容器镜像
-│   ├── docker-compose.yml          #   一键启动
-│   ├── requirements.txt            #   Python 依赖
-│   └── config.toml.example         #   配置模板
-├── worker/                         # Worker: 执行面
-│   ├── daemon.py                   #   主进程 (注册 + SSE 监听 + 重连)
-│   ├── reporter.py                 #   结果上报 (POST 回 Master)
-│   ├── executor/
-│   │   ├── base.py                 #   抽象执行器接口
-│   │   ├── shell.py                #   Shell 命令执行器
-│   │   └── file.py                 #   文件读写/列表执行器
-│   ├── Dockerfile                  #   容器镜像
-│   ├── docker-compose.yml          #   一键启动
-│   ├── requirements.txt            #   Python 依赖
-│   └── config.toml.example         #   配置模板
-├── client/                         # Client: CLI 客户端
-│   ├── gaia_bridge_client.py        #   命令行客户端
-│   └── config.ini.example          #   配置模板
-├── README.md
-├── README_zh.md
-├── agent.md
-└── .gitignore
-```
-
 ## 架构
 
 ```
@@ -77,244 +35,83 @@ GaiaBridge/
 | **Worker** | 轻量守护进程，连接 Master、执行任务、上报结果 |
 | **Client** | CLI 工具或 SDK，向 Master 调度任务 |
 
-## 快速开始
+## 目录结构
 
-### 1. 部署
+```
+GaiaBridge/
+├── deploy.py                       # 统一交互式部署脚本 (菜单驱动)
+├── shared/                         # 共享协议与工具
+│   ├── protocol.py                 #   Pydantic 数据模型 (Node, Task, SSEEvent, 枚举)
+│   ├── auth.py                     #   Token 生成与验证
+│   └── config.py                   #   MasterConfig / WorkerConfig 配置模式
+├── master/                         # Master: 中央控制面
+│   ├── app.py                      #   Starlette 应用入口
+│   ├── registry.py                 #   节点注册表 (SQLite)
+│   ├── broker.py                   #   SSE 连接池管理器
+│   ├── router.py                   #   任务调度与 Future 匹配
+│   ├── auth.py                     #   Bearer Token 中间件
+│   ├── api/
+│   │   ├── nodes.py                #   节点注册/心跳/列表/SSE
+│   │   └── tasks.py                #   任务调度/结果端点
+│   ├── Dockerfile
+│   ├── docker-compose.yml
+│   ├── requirements.txt
+│   └── config.toml.example
+├── worker/                         # Worker: 执行面
+│   ├── daemon.py                   #   主进程 (注册 + SSE 监听 + 重连)
+│   ├── reporter.py                 #   结果上报 (POST 回 Master)
+│   ├── executor/
+│   │   ├── base.py                 #   抽象执行器接口
+│   │   ├── shell.py                #   Shell 命令执行器
+│   │   ├── file.py                 #   文件读写/列表执行器
+│   │   └── system_info.py          #   系统信息执行器 (无需 Shell)
+│   ├── Dockerfile
+│   ├── docker-compose.yml
+│   ├── requirements.txt
+│   └── config.toml.example
+├── client/                         # Client: CLI 客户端
+│   ├── gaia_bridge_client.py
+│   └── config.ini.example
+├── docs/
+│   ├── deploy.md                   # 部署指南 (英文)
+│   └── user_guide.md               # 使用指南 (英文)
+├── README.md
+├── README_zh.md
+├── agent.md
+└── .gitignore
+```
+
+## 快速部署
 
 ```bash
 cd GaiaBridge/
 python3 deploy.py
 ```
 
-统一部署脚本完全菜单驱动 — 无需命令行参数。引导你完成 Master、Worker 或两者的配置。
+部署脚本完全菜单驱动，引导完成 Master、Worker 或两者的配置。完整部署指南（包括 Nginx 配置、构建参数、镜像选择及故障排查）见 [docs/deploy.md](docs/deploy.md)。
 
-#### Master (中央控制面)
-
-Master 始终以容器模式部署 (Docker)。脚本会提示：
-
-- 绑定地址与端口
-- 认证 Token (自动生成或手动输入)
-- 镜像选择 (国际或国内镜像)
-
-配置与持久化数据存储在 `~/.gaia_bridge/master/` 下：
-
-```
-~/.gaia_bridge/master/
-├── config.toml    # Master 配置
-└── data/          # SQLite 数据库 (registry.db)
-```
-
-Master 监听 `127.0.0.1:9210`，通过 Nginx 反向代理暴露 HTTPS。
-
-#### Worker (执行节点)
-
-Worker 支持两种部署模式：
-
-- **容器模式** — Docker 沙箱，将用户选择的宿主机目录挂载为 `/workspace`。适合共享服务器以及只应访问指定工作区的工作负载。
-- **宿主机模式** — 在 Linux 上以 systemd 用户服务运行，或在 Windows 上以计划任务运行，命令直接在宿主机执行。适合受信任的个人机器。
-
-### 2. 配置 Nginx
-
-将以下配置合并到 HTTPS server 块中 (参见 `master/nginx.conf.example`):
-
-```nginx
-location /gb/ {
-    proxy_pass http://127.0.0.1:9210/;
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-
-    # SSE 需要关闭缓冲
-    proxy_buffering off;
-    proxy_cache off;
-    proxy_read_timeout 3600s;
-    proxy_send_timeout 3600s;
-
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-}
-```
-
-重载: `sudo nginx -t && sudo systemctl reload nginx`
-
-### 3. 同机部署 Master + Worker
-
-当 Master 和 Worker 在同一台机器上时，选择菜单中的 "Both" 选项。脚本先部署 Master，再配置 Worker。Worker 直接指向 localhost 以避免 SSE 流经公网：
-
-```toml
-# worker/config.toml
-master_url = "http://127.0.0.1:9210"
-```
-
-### 4. 调度任务
+## 快速使用
 
 ```bash
-# 通过 Nginx 代理 (外部客户端):
-curl -X POST https://<master-domain>/gb/api/tasks/dispatch \
-  -H "Authorization: Bearer <client-token>" \
-  -H "Content-Type: application/json" \
-  -d '{"target_node": "worker-1", "payload": {"task_type": "shell", "params": {"command": "uname -a"}}}'
+# 列出已注册的 Worker
+python client/gaia_bridge_client.py nodes
 
-# 或直连 Master 端口 (本地):
-curl -X POST http://127.0.0.1:9210/api/tasks/dispatch \
-  -H "Authorization: Bearer <client-token>" \
-  -H "Content-Type: application/json" \
-  -d '{"target_node": "worker-1", "payload": {"task_type": "shell", "params": {"command": "uname -a"}}}'
+# 在指定 Worker 上执行 Shell 命令
+python client/gaia_bridge_client.py run worker-1 "uname -a"
 ```
 
-## API 端点
+完整使用指南（包括配置说明、所有 CLI 命令、直接 API 调用、错误码及能力词汇表）见 [docs/user_guide.md](docs/user_guide.md)。
 
-| 方法 | 路径 | 认证 | 描述 |
-|---|---|---|---|
-| POST | `/api/nodes/register` | Node Token | 注册 Worker 节点 |
-| POST | `/api/nodes/heartbeat` | Node Token | 更新节点心跳 |
-| GET | `/api/nodes` | - | 列出所有已注册节点 |
-| GET | `/api/events?node_id=X` | Node Token | Worker 的 SSE 事件流 |
-| POST | `/api/tasks/dispatch` | Client Token | 调度任务 (异步) |
-| POST | `/api/tasks/dispatch_sync` | Client Token | 调度任务并等待结果 |
-| POST | `/api/tasks/result` | Node Token | Worker 上报任务结果 |
-| GET | `/api/tasks/{task_id}` | - | 获取任务结果 |
-| GET | `/health` | - | 健康检查 |
+## 贡献
 
-## 配置
-
-配置默认从本地文件加载。环境变量作为覆盖层，用于容器编排和密钥注入。
-
-加载顺序：
-
-```text
-环境变量 > 配置文件 > 默认值
-```
-
-### Master (`master/config.toml`)
-
-| TOML 键 | 环境变量覆盖 | 默认值 | 描述 |
-|---|---|---|---|
-| `master.host` | `MASTER_HOST` | `0.0.0.0` | 绑定地址 |
-| `master.port` | `MASTER_PORT` | `9210` | 监听端口 |
-| `auth.node_token` | `NODE_TOKEN` | (必填) | Worker 认证 Token |
-| `auth.client_token` | `CLIENT_TOKEN` | (必填) | Client/Agent 认证 Token |
-| `master.heartbeat_timeout` | `HEARTBEAT_TIMEOUT` | `60` | 心跳超时秒数 |
-| `master.db_path` | `MASTER_DB` | `/app/data/registry.db` | SQLite 数据库路径 (容器内) |
-
-Master 容器在运行时读取 `/etc/gaia_bridge/master.toml`。Compose 文件通过 `GAIABRIDGE_MASTER_CONFIG` 和 `GAIABRIDGE_MASTER_DATA` 环境变量，将宿主机 `~/.gaia_bridge/master/` 下的配置与数据目录挂载到容器内。
-
-### Worker (`worker/config.toml`)
-
-| TOML 键 | 环境变量覆盖 | 默认值 | 描述 |
-|---|---|---|---|
-| `worker.mode` | `WORKER_MODE` | `container` | 部署模式: `"host"` 或 `"container"` |
-| `worker.node_id` | `NODE_ID` | (必填) | Worker 唯一标识 |
-| `worker.master_url` | `MASTER_URL` | `https://localhost:9210` | Master 端点 URL |
-| `auth.node_token` | `NODE_TOKEN` | (必填) | 认证 Token (需与 Master 一致) |
-| `worker.workspace` | `WORKSPACE_DIR` | `/workspace` | 工作空间路径 (容器: `/workspace`; 宿主机: `~/gaia_bridge_workspace`) |
-| `worker.command_timeout` | `COMMAND_TIMEOUT` | `120` | Shell 命令超时秒数 |
-| `worker.reconnect_interval` | `RECONNECT_INTERVAL` | `5` | 重连间隔秒数 |
-
-配置文件位置 (按优先级解析):
-
-1. `$GAIABRIDGE_CONFIG` 环境变量
-2. `~/.gaia_bridge/worker/config.toml` (宿主机模式默认)
-3. `/etc/gaia_bridge/worker.toml` (容器模式默认)
-4. `worker/config.toml` (开发模式回退)
-
-Worker 容器读取 `/etc/gaia_bridge/worker.toml`；通过根目录部署脚本部署时，Compose 会从 `~/.gaia_bridge/worker/config.toml` 挂载配置。容器模式下，部署时选择的宿主机工作目录会挂载到容器内的 `worker.workspace`。例如要让任务访问 `/home/ubuntu/repo`，保持 `worker.workspace = "/workspace"`，并在部署脚本询问宿主机挂载目录时填写 `/home/ubuntu/repo`。
-
-宿主机模式会将一份稳定的应用副本安装到 `~/.gaia_bridge/worker/app`，并通过 `~/.gaia_bridge/worker/venv` 运行。部署完成后，Worker 服务不依赖源码仓库所在路径。
-
-### Client (`client/config.ini`)
-
-Client 使用 INI 格式以兼容旧版 Python 无需额外依赖。自动读取 `client/config.ini`，或通过 `--config` / `GAIABRIDGE_CLIENT_CONFIG` 指定路径。
-
-| INI 键 | 环境变量覆盖 | 默认值 | 描述 |
-|---|---|---|---|
-| `client.master_url` | `MASTER_URL` | `https://<your-domain>/gb` | Master API 基础 URL |
-| `client.client_token` | `CLIENT_TOKEN` | (必填) | Client Bearer Token |
-| `client.timeout` | `CLIENT_TIMEOUT` | `120` | 同步任务超时秒数 |
-
-## 构建系统
-
-### Docker 构建要求
-
-在 Docker 默认桥接网络无 DNS 解析的机器上 (常见于云服务器)，以下两个标志为**必需**：
-
-| 标志 | 原因 |
-|---|---|
-| `DOCKER_BUILDKIT=0` | BuildKit 的 `--network=host` 不可靠；传统构建器可正常传递宿主机网络 |
-| `--network=host` | 让构建容器使用宿主机网络栈，使 `apt-get` 和 `pip` 能访问外部仓库 |
-
-### ARG 作用域 (Dockerfile)
-
-`FROM` 之前声明的 ARG 仅在 `FROM` 指令中可见。若要在 `RUN` 步骤中使用，需在 `FROM` 之后重新声明：
-
-```dockerfile
-ARG APT_MIRROR=deb.debian.org
-FROM ${PYTHON_IMAGE}
-ARG APT_MIRROR          # 重新声明以引入作用域
-RUN sed -i "s|http://deb.debian.org|http://${APT_MIRROR}|g" ...
-```
-
-### 镜像配置
-
-| 构建参数 | 默认值 (国际) | 国内示例 |
-|---|---|---|
-| `PYTHON_IMAGE` | `python:3.12-slim` | (保持默认) |
-| `APT_MIRROR` | `deb.debian.org` | `mirrors.tuna.tsinghua.edu.cn` |
-| `PIP_INDEX_URL` | `https://pypi.org/simple` | `https://pypi.tuna.tsinghua.edu.cn/simple` |
-
-切换国内镜像，在部署脚本询问时选择 "yes"：
-
-```
-Use China mirrors (tuna.tsinghua.edu.cn)? [Y/n]:
-```
-
-选择国内镜像将设置:
-
-## 安全
-
-- **双 Token 机制**: Node Token (Worker 身份) 与 Client Token (调度权限) 分离
-- **全出站网络**: Worker 不暴露入站端口
-- **路径遍历拦截**: 所有文件操作通过 realpath 验证强制限制在工作目录内
-- **容器隔离**: Master 和 Worker 均以非 root 用户在 Docker 中运行
-- **命令超时**: 长时间运行的命令自动终止
-- **无硬编码密钥**: Token 从本地配置文件或环境变量加载
-- **Master 仅本地监听**: Master 绑定 127.0.0.1，仅通过 Nginx 反向代理暴露
-
-## 故障排查
-
-### 构建报 "Undetermined Error" (apt-get)
-
-构建容器无法访问 Debian 仓库。三种解决方案：
-
-1. 使用 `DOCKER_BUILDKIT=0 docker build --network=host`
-2. 通过 `--build-arg APT_MIRROR=...` 使用就近镜像
-3. 确认 `APT_MIRROR` 在 Dockerfile 中 `FROM` 之后重新声明
-
-### Worker 无法连接 Master
-
-- 验证 Master 可达: `curl <MASTER_URL>/health`
-- 检查 `NODE_TOKEN` 与 Master 配置是否一致
-- 确保防火墙未阻止出站 HTTPS
-
-### 任务已调度但无结果
-
-- 检查目标 Worker 是否在线: `GET /api/nodes`
-- 确认 Worker SSE 连接活跃
-- 查看 Worker 日志:
-  - 容器模式: `docker compose logs worker`
-  - Linux 宿主机模式: `journalctl --user -u gaia-bridge-worker -f`
-  - Windows 宿主机模式: `schtasks /Query /TN GaiaBridgeWorker`
-- **SSE 换行符**: 守护进程必须使用 `\r\n\r\n` 作为事件分隔符
-- **同机 Worker**: 优先使用 `master_url = "http://127.0.0.1:9210"`
+欢迎提交 Issue 或 Pull Request。
 
 ## License
 
 GaiaBridge 使用 open-core 授权模式：
 
-- `client/`、`worker/`、`shared/`、`doc/`、部署工具和根目录项目文件使用 Apache-2.0。
+- `client/`、`worker/`、`shared/`、`docs/`、部署工具和根目录项目文件使用 Apache-2.0。
 - `master/` 是 Community Master，使用 AGPL-3.0-only。
-- 商业 Master 管理系统、Hosted 服务、计费、租户管理、区域中继、企业策略和相关云服务功能可以在独立闭源商业条款下开发和分发。
+- 商业 Master 管理系统、Hosted 服务、计费、租户管理、区域中继、企业策略和相关云服务功能会在独立闭源商业条款下开发和分发。
 
 详见 [LICENSE](LICENSE)。

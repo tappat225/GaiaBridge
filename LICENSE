@@ -27,7 +27,7 @@ license notice, the repository is licensed as follows:
    - client/
    - worker/
    - shared/
-   - doc/
+   - docs/
 
    and root-level project files, including deploy.py, README.md,
    README_zh.md, AGENTS.md, and CLAUDE.md, are licensed under the
