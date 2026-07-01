@@ -1,6 +1,18 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""GaiaBridge client: dispatch tasks to a worker through the Master API."""
+"""GaiaBridge client: dispatch tasks to a worker through the Master API.
+
+Usage:
+  gaia nodes                              List registered workers
+  gaia run <node> <command>               Run a shell command on a worker
+  gaia read <node> <path>                 Read a file on a worker
+  gaia write <node> <path> <content>      Write content to a file on a worker
+  gaia ls <node> [path]                   List directory contents on a worker
+  gaia info <node>                        Show system information for a worker
+
+Legacy aliases (still supported):
+  list_nodes, run_command, read_file, write_file, list_directory, system_info
+"""
 
 import argparse
 import json
@@ -21,6 +33,17 @@ TOOLS = {
     "write_file": "Write a file",
     "list_directory": "List directory contents",
     "system_info": "Show basic system information",
+}
+
+# New command names and their legacy/old-style equivalents
+COMMAND_ALIASES = {
+    # new -> (legacy_action, tool_help)
+    "nodes":   ("list_nodes", "List registered worker nodes"),
+    "run":     ("run_command", "Execute a shell command on a worker"),
+    "read":    ("read_file", "Read a file from a worker"),
+    "write":   ("write_file", "Write content to a file on a worker"),
+    "ls":      ("list_directory", "List directory contents on a worker"),
+    "info":    ("system_info", "Show system information for a worker"),
 }
 
 
@@ -60,7 +83,7 @@ class GaiaBridgeClient:
         return self._get_json("/api/nodes")
 
     def dispatch_sync(self, node_id, task_type, params):
-        result = self._post_json(
+        return self._post_json(
             "/api/tasks/dispatch_sync",
             {
                 "target_node": node_id,
@@ -71,10 +94,6 @@ class GaiaBridgeClient:
                 },
             },
         )
-        error = result.get("error", "")
-        if error:
-            raise RuntimeError(error)
-        return result
 
 
 def build_task(action, args):
@@ -87,7 +106,7 @@ def build_task(action, args):
     if action == "list_directory":
         return "list_dir", {"path": args.path}
     if action == "system_info":
-        return "shell", {"command": "pwd; uname -a; echo; df -h .; echo; id"}
+        return "system_info", {}
     raise RuntimeError(f"unknown action: {action}")
 
 
@@ -95,11 +114,22 @@ def print_result(result):
     output = result.get("output", "")
     error = result.get("error", "")
     status = result.get("status", "")
+    error_code = result.get("error_code", "")
+    truncated = result.get("truncated", False)
+
+    if error_code:
+        prefix = f"[{error_code}]"
+        if truncated:
+            prefix += " [truncated]"
+        print(prefix, file=sys.stderr)
 
     if output:
         print(output)
     if error:
-        print(error, file=sys.stderr)
+        if error_code:
+            print(f"  {error}", file=sys.stderr)
+        else:
+            print(error, file=sys.stderr)
     if status and status != "completed":
         raise SystemExit(1)
 
@@ -109,27 +139,29 @@ def print_nodes(nodes):
         print("(no nodes)")
         return
 
-    print("node_id\tstatus\thostname\tos\tworkspace\tcapabilities")
+    # header
+    print("node_id  status    hostname  os  mode       capabilities  workspace")
     for node in nodes:
-        print(
-            "\t".join([
-                str(node.get("node_id", "")),
-                str(node.get("status", "")),
-                str(node.get("hostname", "")),
-                str(node.get("os", "")),
-                str(node.get("workspace", "")),
-                ",".join(node.get("capabilities", [])),
-            ])
-        )
+        nid = str(node.get("node_id", ""))
+        st = str(node.get("status", ""))
+        hn = str(node.get("hostname", ""))
+        os = str(node.get("os", ""))
+        mode = str(node.get("mode", ""))
+        caps = ",".join(node.get("capabilities", []))
+        ws = str(node.get("workspace", ""))
+        print(f"{nid:8s} {st:8s} {hn:8s} {os:3s} {mode:10s} {caps:12s} {ws}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Dispatch GaiaBridge tasks")
+    parser = argparse.ArgumentParser(
+        description="GaiaBridge CLI - dispatch tasks to remote workers")
+
     parser.add_argument("--config", help="path to client INI config")
 
     sub = parser.add_subparsers(dest="action", required=True)
 
-    sub.add_parser("list_nodes", help="List registered worker nodes")
+    # -- Legacy commands (keep compatibility) --
+    sub.add_parser("list_nodes", help=TOOLS["run_command"])
 
     p = sub.add_parser("run_command", help=TOOLS["run_command"])
     p.add_argument("--node", required=True, help="target worker node id")
@@ -151,16 +183,71 @@ def main():
     p = sub.add_parser("system_info", help=TOOLS["system_info"])
     p.add_argument("--node", required=True, help="target worker node id")
 
+    # -- New user-facing commands --
+    p = sub.add_parser("nodes", help=COMMAND_ALIASES["nodes"][1])
+    p.add_argument("--node", nargs="?", help="filter by node id (optional)")
+
+    p = sub.add_parser("run", help=COMMAND_ALIASES["run"][1])
+    p.add_argument("node", help="target worker node id")
+    p.add_argument("command", help="shell command to execute")
+
+    p = sub.add_parser("read", help=COMMAND_ALIASES["read"][1])
+    p.add_argument("node", help="target worker node id")
+    p.add_argument("path", help="file path to read")
+
+    p = sub.add_parser("write", help=COMMAND_ALIASES["write"][1])
+    p.add_argument("node", help="target worker node id")
+    p.add_argument("path", help="file path to write")
+    p.add_argument("content", help="content to write")
+
+    p = sub.add_parser("ls", help=COMMAND_ALIASES["ls"][1])
+    p.add_argument("node", help="target worker node id")
+    p.add_argument("path", nargs="?", default=".", help="directory path (default: .)")
+
+    p = sub.add_parser("info", help=COMMAND_ALIASES["info"][1])
+    p.add_argument("node", help="target worker node id")
+
     args = parser.parse_args()
     config = load_client_config(args.config)
     client = GaiaBridgeClient(config)
 
     try:
-        if args.action == "list_nodes":
+        # Map new commands to legacy actions
+        action = args.action
+        if action in COMMAND_ALIASES:
+            legacy_action, _ = COMMAND_ALIASES[action]
+
+            if action == "nodes":
+                nodes = client.list_nodes()
+                if args.node:
+                    nodes = [n for n in nodes if n.get("node_id") == args.node]
+                print_nodes(nodes)
+                return
+
+            # All other new commands need the node arg passed positionally
+            if action == "run":
+                task_type, params = build_task(legacy_action, args)
+                print_result(client.dispatch_sync(args.node, task_type, params))
+            elif action == "read":
+                task_type, params = build_task(legacy_action, args)
+                print_result(client.dispatch_sync(args.node, task_type, params))
+            elif action == "write":
+                task_type, params = build_task(legacy_action, args)
+                print_result(client.dispatch_sync(args.node, task_type, params))
+            elif action == "ls":
+                task_type, params = build_task(legacy_action, args)
+                print_result(client.dispatch_sync(args.node, task_type, params))
+            elif action == "info":
+                task_type, params = build_task(legacy_action, args)
+                print_result(client.dispatch_sync(args.node, task_type, params))
+            return
+
+        # Legacy command handling
+        if action == "list_nodes":
             print_nodes(client.list_nodes())
             return
 
-        task_type, params = build_task(args.action, args)
+        task_type, params = build_task(action, args)
         print_result(client.dispatch_sync(args.node, task_type, params))
     except Exception as e:
         print(f"error: {e}", file=sys.stderr)

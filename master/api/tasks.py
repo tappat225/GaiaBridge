@@ -5,7 +5,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
-from shared.protocol import Task, TaskPayload, TaskResult, TaskStatus
+from shared.protocol import ErrorCode, Task, TaskPayload, TaskResult, TaskStatus
 from master.auth import require_client_token, require_node_token
 
 
@@ -23,7 +23,7 @@ def create_routes(router, registry, node_token: str, client_token: str) -> list[
         sent = await router.dispatch(task)
         if not sent:
             return JSONResponse(
-                {"error": "node offline or not connected", "task_id": task.task_id},
+                {"error": "node offline or not connected", "error_code": ErrorCode.node_offline.value},
                 status_code=503)
         return JSONResponse({"task_id": task.task_id, "status": "dispatched"})
 
@@ -39,11 +39,14 @@ def create_routes(router, registry, node_token: str, client_token: str) -> list[
         sent = await router.dispatch(task)
         if not sent:
             return JSONResponse(
-                {"error": "node offline or not connected"}, status_code=503)
+                {"error": "node offline or not connected", "error_code": ErrorCode.node_offline.value},
+                status_code=503)
         result = await router.wait_result(task.task_id, timeout=task.timeout)
         if result:
             return JSONResponse(result.model_dump(mode="json"))
-        return JSONResponse({"error": "timeout"}, status_code=504)
+        return JSONResponse(
+            {"error": "timeout", "error_code": ErrorCode.timeout.value},
+            status_code=504)
 
     async def report_result(request: Request):
         err = await require_node_token(request, node_token)

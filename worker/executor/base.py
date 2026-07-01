@@ -3,7 +3,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
 
 @dataclass
@@ -11,6 +11,7 @@ class ExecResult:
     success: bool
     output: str = ""
     error: str = ""
+    error_code: Optional[str] = None
 
 
 class BaseExecutor(ABC):

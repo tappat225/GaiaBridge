@@ -37,6 +37,54 @@ class TaskType(str, Enum):
     system_info = "system_info"
 
 
+class ErrorCode(str, Enum):
+    """Structured machine-readable error codes for task results."""
+    node_offline = "node_offline"
+    auth_denied = "auth_denied"
+    capability_not_found = "capability_not_found"
+    schema_invalid = "schema_invalid"
+    workspace_violation = "workspace_violation"
+    timeout = "timeout"
+    output_too_large = "output_too_large"
+    execution_failed = "execution_failed"
+    worker_unhealthy = "worker_unhealthy"
+    rate_limited = "rate_limited"
+
+
+class Capability(str, Enum):
+    """Product-facing capability names exposed to users and agents."""
+    system_info = "system.info"
+    file_list = "file.list"
+    file_read = "file.read"
+    file_write = "file.write"
+    shell_run = "shell.run"
+
+
+# Map from product-facing Capability to internal TaskType
+CAPABILITY_TO_TASK_TYPE: dict[Capability, TaskType] = {
+    Capability.system_info: TaskType.system_info,
+    Capability.file_list: TaskType.list_dir,
+    Capability.file_read: TaskType.file_read,
+    Capability.file_write: TaskType.file_write,
+    Capability.shell_run: TaskType.shell,
+}
+
+# Reverse map: internal TaskType -> product-facing Capability
+TASK_TYPE_TO_CAPABILITY: dict[TaskType, Capability] = {
+    v: k for k, v in CAPABILITY_TO_TASK_TYPE.items()
+}
+
+# Legacy backward-compatible aliases for CLI
+LEGACY_TO_CAPABILITY: dict[str, Capability] = {
+    "list_nodes": None,
+    "run_command": Capability.shell_run,
+    "read_file": Capability.file_read,
+    "write_file": Capability.file_write,
+    "list_directory": Capability.file_list,
+    "system_info": Capability.system_info,
+}
+
+
 # ============================================================
 # Node models
 # ============================================================
@@ -91,6 +139,8 @@ class TaskResult(BaseModel):
     status: TaskStatus
     output: str = ""
     error: str = ""
+    error_code: Optional[str] = None
+    truncated: bool = False
     completed_at: datetime = Field(default_factory=datetime.utcnow)
 
 

@@ -12,9 +12,66 @@ GaiaBridge is a distributed multi-host remote operation and AI Agent coordinatio
 | Master | `master/` | Central control plane (Starlette + SSE + SQLite) |
 | Worker | `worker/` | Execution daemon with pluggable executors |
 | MCP Server (legacy) | `server/` | Single-node FastMCP + Docker |
+| MCP Server (legacy) | `server/` | Single-node FastMCP + Docker |
 | CLI Client (legacy) | `client/` | Command-line client + persistent session daemon |
 
 ## Rules
+
+### 0. Structured Error Codes
+
+Task results carry machine-readable error codes alongside human messages:
+
+| Code | Meaning |
+|---|---|
+| `node_offline` | Target worker is not connected |
+| `auth_denied` | Token missing or invalid |
+| `capability_not_found` | Task type not supported by worker |
+| `schema_invalid` | Request body failed validation |
+| `workspace_violation` | Path resolved outside workspace boundary |
+| `timeout` | Command or sync-wait exceeded deadline |
+| `output_too_large` | Result output exceeded `max_output_size` |
+| `execution_failed` | Generic execution error |
+| `worker_unhealthy` | Worker reported unhealthy state |
+| `rate_limited` | Too many requests |
+
+The `TaskResult` model includes `error_code: Optional[str]` and `truncated: bool` fields.
+
+### 0.1 Capability Vocabulary
+
+Product-facing capability names (used in CLI and registration):
+
+| Capability | Task Type | Description |
+|---|---|---|
+| `system.info` | `system_info` | Host OS and resource info |
+| `file.list` | `list_dir` | List directory contents |
+| `file.read` | `file_read` | Read file content |
+| `file.write` | `file_write` | Write content to file |
+| `shell.run` | `shell` | Execute shell command |
+
+The `Capability` enum and mapping tables are in `shared/protocol.py`.
+
+### 0.2 CLI Commands
+
+| Command | Legacy Alias | Description |
+|---|---|---|
+| `gaia nodes` | `list_nodes` | List registered workers |
+| `gaia run <node> <cmd>` | `run_command` | Execute shell command |
+| `gaia read <node> <path>` | `read_file` | Read a file |
+| `gaia write <node> <path> <content>` | `write_file` | Write content to a file |
+| `gaia ls <node> [path]` | `list_directory` | List directory contents |
+| `gaia info <node>` | `system_info` | Show system information |
+
+Old command names remain usable for backward compatibility.
+
+### 0.3 Output Size Limit
+
+Worker config `max_output_size` (env: `MAX_OUTPUT_SIZE`) caps result output
+at 200,000 bytes by default. Exceeding this returns `output_too_large` with an
+empty output and truncated flag set.
+
+Truncation is applied centrally in the worker daemon (`_truncate`) — executors
+no longer hardcode their own slice limits, so the configured maximum is always
+authoritative.
 
 ### 1. Default Language — English Only
 
@@ -97,6 +154,10 @@ Cross-directory imports must go through `shared/`. Master and Worker must not im
 - **Container mode**: filesystem isolation is provided by Docker namespace boundaries
 - **Host mode**: the worker has full host filesystem access; security is enforced
   at the tool-calling / Master layer rather than at the filesystem level
+- **Workspace boundary enforcement**: all file and shell executors resolve paths
+  against the configured workspace and reject paths that escape it, returning
+  `workspace_violation` error code. Path traversal (`../../`) is blocked at the
+  executor level for read, write, list, and shell cwd operations.
 - Worker workspace is configured by `worker.workspace` or the `WORKSPACE_DIR`
   override. In container mode it defaults to `/workspace`; in host mode to `/`.
 - The Docker host directory mounted at `/workspace` is controlled by

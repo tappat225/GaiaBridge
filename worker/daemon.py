@@ -9,9 +9,11 @@ import platform
 import httpx
 
 from shared.config import WorkerConfig, load_worker_config
-from shared.protocol import TaskResult, TaskStatus, TaskType
+from shared.protocol import Capability, ErrorCode, TaskResult, TaskStatus, TaskType
+from .executor.base import ExecResult
 from .executor.shell import ShellExecutor
 from .executor.file import FileExecutor
+from .executor.system_info import SystemInfoExecutor
 from .reporter import Reporter
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -24,8 +26,10 @@ class WorkerDaemon:
         self._mode = self._config.mode
         self._shell = ShellExecutor(self._config.workspace, self._config.command_timeout)
         self._file = FileExecutor(self._config.workspace)
+        self._system_info = SystemInfoExecutor()
         self._reporter = Reporter(self._config.master_url, self._config.node_token)
         self._running = False
+        self._max_output = self._config.max_output_size
 
     def _headers(self):
         return {
@@ -34,7 +38,7 @@ class WorkerDaemon:
 
     def _register(self):
         url = self._config.master_url.rstrip("/") + "/api/nodes/register"
-        capabilities = ["shell", "file"]
+        capabilities = [c.value for c in Capability]
         data = {
             "node_id": self._config.node_id,
             "hostname": platform.node(),
@@ -47,6 +51,17 @@ class WorkerDaemon:
         logger.info("worker: registered as %s (mode=%s)", self._config.node_id, self._mode)
         return resp.status_code == 200
 
+    def _truncate(self, result: ExecResult) -> ExecResult:
+        """Truncate output if it exceeds max size."""
+        if len(result.output.encode("utf-8")) > self._max_output:
+            return ExecResult(
+                success=False,
+                output="",
+                error=f"output truncated at {self._max_output} bytes",
+                error_code=ErrorCode.output_too_large.value,
+            )
+        return result
+
     async def _handle_task(self, task_data: dict):
         task_id = task_data.get("task_id", "")
         payload = task_data.get("payload", {})
@@ -57,24 +72,33 @@ class WorkerDaemon:
 
         if task_type in (TaskType.shell, "shell"):
             result = await self._shell.execute(params)
+            result = self._truncate(result)
+        elif task_type in (TaskType.system_info, "system_info"):
+            result = await self._system_info.execute(params)
         elif task_type in (TaskType.file_read, "file_read"):
             params["action"] = "read"
             result = await self._file.execute(params)
+            result = self._truncate(result)
         elif task_type in (TaskType.file_write, "file_write"):
             params["action"] = "write"
             result = await self._file.execute(params)
         elif task_type in (TaskType.list_dir, "list_dir"):
             params["action"] = "list"
             result = await self._file.execute(params)
+            result = self._truncate(result)
         else:
-            result = type("R", (), {"success": False, "output": "", "error": f"unknown task type: {task_type}"})()
+            result = ExecResult(
+                success=False, output="", error=f"unknown task type: {task_type}",
+                error_code=ErrorCode.capability_not_found.value)
 
         task_result = TaskResult(
             task_id=task_id,
             node_id=self._config.node_id,
             status=TaskStatus.completed if result.success else TaskStatus.failed,
             output=result.output,
-            error=result.error)
+            error=result.error,
+            error_code=result.error_code if hasattr(result, 'error_code') and result.error_code else None,
+            truncated=getattr(result, 'error_code', None) == ErrorCode.output_too_large.value)
         self._reporter.report(task_result)
 
     async def _listen_sse(self):

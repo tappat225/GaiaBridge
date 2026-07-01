@@ -32,7 +32,8 @@ GaiaBridge/
 │   ├── executor/
 │   │   ├── base.py                 #   Abstract executor interface
 │   │   ├── shell.py                #   Shell command executor
-│   │   └── file.py                 #   File read/write/list executor
+│   │   ├── file.py                 #   File read/write/list executor
+│   │   └── system_info.py          #   System info executor (no shell)
 │   ├── Dockerfile                  #   Container image
 │   ├── docker-compose.yml          #   One-command startup
 │   ├── requirements.txt            #   Python dependencies
@@ -157,7 +158,36 @@ localhost to avoid network path issues with SSE streaming:
 master_url = "http://127.0.0.1:9210"
 ```
 
-### 4. Dispatch a task
+### 4. Use the CLI
+
+The `gaia` client provides short commands for common operations:
+
+```bash
+# List registered workers
+python client/gaia_bridge_client.py nodes
+
+# Run a shell command
+python client/gaia_bridge_client.py run worker-1 "uname -a"
+
+# Read a file
+python client/gaia_bridge_client.py read worker-1 /etc/hostname
+
+# List directory contents
+python client/gaia_bridge_client.py ls worker-1 /tmp
+
+# Get system info
+python client/gaia_bridge_client.py info worker-1
+```
+
+Legacy command names are also supported for backward compatibility:
+
+```bash
+python client/gaia_bridge_client.py list_nodes
+python client/gaia_bridge_client.py run_command --node worker-1 "uptime"
+python client/gaia_bridge_client.py system_info --node worker-1
+```
+
+Alternatively, dispatch tasks directly via curl:
 
 ```bash
 # Via nginx proxy (external clients):
@@ -226,6 +256,7 @@ variables).
 | `auth.node_token` | `NODE_TOKEN` | (required) | Authentication token (must match Master) |
 | `worker.workspace` | `WORKSPACE_DIR` | `/workspace` | Workspace path (container: `/workspace`; host: `~/gaia_bridge_workspace`) |
 | `worker.command_timeout` | `COMMAND_TIMEOUT` | `120` | Shell command timeout in seconds |
+| `worker.max_output_size` | `MAX_OUTPUT_SIZE` | `200000` | Maximum result output bytes before truncation |
 | `worker.reconnect_interval` | `RECONNECT_INTERVAL` | `5` | Seconds between reconnect attempts |
 
 Config file locations (resolved in order of priority):
@@ -259,8 +290,44 @@ passed with `--config` / `GAIABRIDGE_CLIENT_CONFIG`.
 | `client.client_token` | `CLIENT_TOKEN` | (required) | Client bearer token |
 | `client.timeout` | `CLIENT_TIMEOUT` | `120` | Synchronous task timeout in seconds |
 
-The client intentionally has no default node. Run `list_nodes` and pass
-`--node <node-id>` on every worker operation.
+The client intentionally has no default node. Run `nodes` and pass
+`<node-id>` on every worker operation.
+
+## Structured Error Codes
+
+Task results include machine-readable error codes for programmatic handling:
+
+| Code | Meaning |
+|---|---|
+| `node_offline` | Target worker is not connected to Master |
+| `auth_denied` | Bearer token missing or does not match |
+| `capability_not_found` | Worker does not support the requested task type |
+| `schema_invalid` | Request body failed validation |
+| `workspace_violation` | File path resolved outside the configured workspace boundary |
+| `timeout` | Command or sync-wait exceeded the configured deadline |
+| `output_too_large` | Result output exceeded `max_output_size`; output is empty |
+| `execution_failed` | Generic execution failure (check `error` field) |
+| `worker_unhealthy` | Worker reported an unhealthy state |
+| `rate_limited` | Too many requests (not yet enforced) |
+
+The `error_code` field is `null`/absent when the task succeeds. The `truncated`
+boolean flag is `true` when output was capped due to size limits.
+
+## Capability Vocabulary
+
+Workers advertise their capabilities as compact strings. The product-facing names
+are mapped to internal task types:
+
+| Capability | Task Type | Description |
+|---|---|---|
+| `system.info` | `system_info` | Host OS, release, memory info |
+| `file.list` | `list_dir` | List directory contents |
+| `file.read` | `file_read` | Read file content |
+| `file.write` | `file_write` | Write content to file |
+| `shell.run` | `shell` | Execute a shell command |
+
+Capabilities appear in the `gaia nodes` listing and are used by Agents to select
+an appropriate worker for a task.
 
 ## Build System
 

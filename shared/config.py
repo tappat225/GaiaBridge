@@ -107,6 +107,7 @@ class WorkerConfig:
     workspace: str = "/workspace"
     command_timeout: int = 120
     reconnect_interval: int = 5
+    max_output_size: int = 200_000
 
     @classmethod
     def load(cls, path: str | os.PathLike[str] | None = None) -> "WorkerConfig":
@@ -127,6 +128,10 @@ class WorkerConfig:
             reconnect_interval=_as_int(
                 _env("RECONNECT_INTERVAL", worker.get("reconnect_interval", cls.reconnect_interval)),
                 "RECONNECT_INTERVAL",
+            ),
+            max_output_size=_as_int(
+                _env("MAX_OUTPUT_SIZE", worker.get("max_output_size", cls.max_output_size)),
+                "MAX_OUTPUT_SIZE",
             ),
         )
 
