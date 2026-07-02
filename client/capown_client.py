@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""GaiaBridge client: dispatch tasks to a worker through the Master API.
+"""CapOwn client: dispatch tasks to a worker through the Master API.
 
 Usage:
-  gaia nodes                              List registered workers
-  gaia run <node> <command>               Run a shell command on a worker
-  gaia read <node> <path>                 Read a file on a worker
-  gaia write <node> <path> <content>      Write content to a file on a worker
-  gaia ls <node> [path]                   List directory contents on a worker
-  gaia info <node>                        Show system information for a worker
+  capown nodes                              List registered workers
+  capown run <node> <command>               Run a shell command on a worker
+  capown read <node> <path>                 Read a file on a worker
+  capown write <node> <path> <content>      Write content to a file on a worker
+  capown ls <node> [path]                   List directory contents on a worker
+  capown info <node>                        Show system information for a worker
 
 Legacy aliases (still supported):
   list_nodes, run_command, read_file, write_file, list_directory, system_info
@@ -47,7 +47,7 @@ COMMAND_ALIASES = {
 }
 
 
-class GaiaBridgeClient:
+class CapOwnClient:
     def __init__(self, config):
         self.config = config
 
@@ -154,7 +154,7 @@ def print_nodes(nodes):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="GaiaBridge CLI - dispatch tasks to remote workers")
+        description="CapOwn CLI - dispatch tasks to remote workers")
 
     parser.add_argument("--config", help="path to client INI config")
 
@@ -209,7 +209,7 @@ def main():
 
     args = parser.parse_args()
     config = load_client_config(args.config)
-    client = GaiaBridgeClient(config)
+    client = CapOwnClient(config)
 
     try:
         # Map new commands to legacy actions

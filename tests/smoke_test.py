@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
 """
-Smoke tests for GaiaBridge protocol and CLI changes.
+Smoke tests for CapOwn protocol and CLI changes.
 
 Run: python tests/smoke_test.py
 """
@@ -90,7 +90,7 @@ def test_legacy_compatibility():
 
 def test_cli_parsing():
     """Verify CLI argument parsing for new and old command names."""
-    from client.gaia_bridge_client import COMMAND_ALIASES, build_task
+    from client.capown_client import COMMAND_ALIASES, build_task
 
     class FakeArgs:
         pass
@@ -267,7 +267,7 @@ def test_output_truncation():
 
 def test_print_result():
     """Verify CLI print_result shows error_code correctly."""
-    from client.gaia_bridge_client import print_result
+    from client.capown_client import print_result
     import io
     import sys
 

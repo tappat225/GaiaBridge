@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Shared protocol definitions for GaiaBridge distributed system."""
+"""Shared protocol definitions for CapOwn distributed system."""
 
 from __future__ import annotations
 

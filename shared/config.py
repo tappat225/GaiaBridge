@@ -57,14 +57,14 @@ def _as_int(value: Any, name: str) -> int:
 
 
 def _default_path(service: str) -> str:
-    env_name = f"GAIABRIDGE_{service.upper()}_CONFIG"
-    configured = os.environ.get("GAIABRIDGE_CONFIG", os.environ.get(env_name, ""))
+    env_name = f"CAPOWN_{service.upper()}_CONFIG"
+    configured = os.environ.get("CAPOWN_CONFIG", os.environ.get(env_name, ""))
     if configured:
         return configured
 
     candidates = [
-        _get_user_home() / ".gaia_bridge" / service / "config.toml",
-        Path("/etc/gaia_bridge") / f"{service}.toml",
+        _get_user_home() / ".capown" / service / "config.toml",
+        Path("/etc/capown") / f"{service}.toml",
         Path(__file__).resolve().parent.parent / service / "config.toml",
     ]
     return str(next((candidate for candidate in candidates if candidate.exists()), ""))

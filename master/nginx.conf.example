@@ -1,4 +1,4 @@
-# GaiaBridge Master — Nginx configuration snippet
+# CapOwn Master — Nginx configuration snippet
 # Merge into your HTTPS server block in /etc/nginx/sites-available/<your-domain>
 
 location /gb/ {

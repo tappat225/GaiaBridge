@@ -1,4 +1,4 @@
-# GaiaBridge — User Guide
+# CapOwn — User Guide
 
 ## Configuration
 
@@ -21,7 +21,7 @@ environment variables > configuration file > defaults
 | `master.heartbeat_timeout` | `HEARTBEAT_TIMEOUT` | `60` | Seconds before marking node offline |
 | `master.db_path` | `MASTER_DB` | `/app/data/registry.db` | SQLite database path (container-side) |
 
-The Master container reads `/etc/gaia_bridge/master.toml` at runtime. The Compose file mounts the host config and data directories from `~/.gaia_bridge/master/` into the container (paths are set via `GAIABRIDGE_MASTER_CONFIG` and `GAIABRIDGE_MASTER_DATA` environment variables).
+The Master container reads `/etc/capown/master.toml` at runtime. The Compose file mounts the host config and data directories from `~/.capown/master/` into the container (paths are set via `CAPOWN_MASTER_CONFIG` and `CAPOWN_MASTER_DATA` environment variables).
 
 ### Worker (`worker/config.toml`)
 
@@ -31,25 +31,25 @@ The Master container reads `/etc/gaia_bridge/master.toml` at runtime. The Compos
 | `worker.node_id` | `NODE_ID` | (required) | Unique identifier for this worker |
 | `worker.master_url` | `MASTER_URL` | `https://localhost:9210` | Master endpoint URL |
 | `auth.node_token` | `NODE_TOKEN` | (required) | Authentication token (must match Master) |
-| `worker.workspace` | `WORKSPACE_DIR` | `/workspace` | Workspace path (container: `/workspace`; host: `~/gaia_bridge_workspace`) |
+| `worker.workspace` | `WORKSPACE_DIR` | `/workspace` | Workspace path (container: `/workspace`; host: `~/.capown/workspace`) |
 | `worker.command_timeout` | `COMMAND_TIMEOUT` | `120` | Shell command timeout in seconds |
 | `worker.max_output_size` | `MAX_OUTPUT_SIZE` | `200000` | Maximum result output bytes before truncation |
 | `worker.reconnect_interval` | `RECONNECT_INTERVAL` | `5` | Seconds between reconnect attempts |
 
 Config file locations (resolved in order of priority):
 
-1. `$GAIABRIDGE_CONFIG` environment variable
-2. `~/.gaia_bridge/worker/config.toml` (host mode default)
-3. `/etc/gaia_bridge/worker.toml` (container mode default)
+1. `$CAPOWN_CONFIG` environment variable
+2. `~/.capown/worker/config.toml` (host mode default)
+3. `/etc/capown/worker.toml` (container mode default)
 4. `worker/config.toml` (dev mode fallback)
 
-The Worker container reads `/etc/gaia_bridge/worker.toml`; the provided Compose file mounts the config from `~/.gaia_bridge/worker/config.toml` when deployed through the root deploy script. In container mode, the host workspace selected during deployment is mounted into the container at `worker.workspace`. For example, to expose `/home/ubuntu/repo` to tasks, keep `worker.workspace = "/workspace"` and enter `/home/ubuntu/repo` when the deploy script asks for the host directory to mount.
+The Worker container reads `/etc/capown/worker.toml`; the provided Compose file mounts the config from `~/.capown/worker/config.toml` when deployed through the root deploy script. In container mode, the host workspace selected during deployment is mounted into the container at `worker.workspace`. For example, to expose `/home/ubuntu/repo` to tasks, keep `worker.workspace = "/workspace"` and enter `/home/ubuntu/repo` when the deploy script asks for the host directory to mount.
 
-Host mode installs a stable application copy under `~/.gaia_bridge/worker/app` and runs it through `~/.gaia_bridge/worker/venv`. This keeps the deployed worker independent from the source checkout path after deployment.
+Host mode installs a stable application copy under `~/.capown/worker/app` and runs it through `~/.capown/worker/venv`. This keeps the deployed worker independent from the source checkout path after deployment.
 
 ### Client (`client/config.ini`)
 
-The client uses INI so it can run on older Python versions without installing extra dependencies. It automatically reads `client/config.ini`, or a custom path passed with `--config` / `GAIABRIDGE_CLIENT_CONFIG`.
+The client uses INI so it can run on older Python versions without installing extra dependencies. It automatically reads `client/config.ini`, or a custom path passed with `--config` / `CAPOWN_CLIENT_CONFIG`.
 
 | INI key | Env override | Default | Description |
 |---|---|---|---|
@@ -63,27 +63,27 @@ The client intentionally has no default node. Run `nodes` and pass `<node-id>` o
 
 ```bash
 # List registered workers
-python client/gaia_bridge_client.py nodes
+python client/capown_client.py nodes
 
 # Run a shell command
-python client/gaia_bridge_client.py run worker-1 "uname -a"
+python client/capown_client.py run worker-1 "uname -a"
 
 # Read a file
-python client/gaia_bridge_client.py read worker-1 /etc/hostname
+python client/capown_client.py read worker-1 /etc/hostname
 
 # List directory contents
-python client/gaia_bridge_client.py ls worker-1 /tmp
+python client/capown_client.py ls worker-1 /tmp
 
 # Get system info
-python client/gaia_bridge_client.py info worker-1
+python client/capown_client.py info worker-1
 ```
 
 Legacy command names are also supported for backward compatibility:
 
 ```bash
-python client/gaia_bridge_client.py list_nodes
-python client/gaia_bridge_client.py run_command --node worker-1 "uptime"
-python client/gaia_bridge_client.py system_info --node worker-1
+python client/capown_client.py list_nodes
+python client/capown_client.py run_command --node worker-1 "uptime"
+python client/capown_client.py system_info --node worker-1
 ```
 
 ## Direct API Usage
@@ -149,4 +149,4 @@ Workers advertise their capabilities as compact strings. The product-facing name
 | `file.write` | `file_write` | Write content to file |
 | `shell.run` | `shell` | Execute a shell command |
 
-Capabilities appear in the `gaia nodes` listing and are used by Agents to select an appropriate worker for a task.
+Capabilities appear in the `capown nodes` listing and are used by Agents to select an appropriate worker for a task.

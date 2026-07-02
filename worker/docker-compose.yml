@@ -7,12 +7,12 @@ services:
         PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.12-slim}
         APT_MIRROR: ${APT_MIRROR:-deb.debian.org}
         PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
-    container_name: gaia-bridge-worker
-    image: gaia-bridge-worker
+    container_name: capown-worker
+    image: capown-worker
     restart: unless-stopped
     network_mode: host
     volumes:
-      - ${GAIABRIDGE_HOST_WORKSPACE:-${HOME}/.gaia_bridge/workspace}:${GAIABRIDGE_CONTAINER_WORKSPACE:-/workspace}:rw
-      - ${GAIABRIDGE_WORKER_CONFIG:-./config.toml}:/etc/gaia_bridge/worker.toml:ro
+      - ${CAPOWN_HOST_WORKSPACE:-${HOME}/.capown/workspace}:${CAPOWN_CONTAINER_WORKSPACE:-/workspace}:rw
+      - ${CAPOWN_WORKER_CONFIG:-./config.toml}:/etc/capown/worker.toml:ro
     environment:
-      - GAIABRIDGE_CONFIG=/etc/gaia_bridge/worker.toml
+      - CAPOWN_CONFIG=/etc/capown/worker.toml

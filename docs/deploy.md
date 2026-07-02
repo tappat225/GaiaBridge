@@ -1,4 +1,4 @@
-# GaiaBridge — Deployment Guide
+# CapOwn — Deployment Guide
 
 ## Prerequisites
 
@@ -9,7 +9,7 @@
 ## Deploy Script
 
 ```bash
-cd GaiaBridge/
+cd CapOwn/
 python3 deploy.py
 ```
 
@@ -23,10 +23,10 @@ Master always deploys in container mode (Docker). The script will prompt for:
 - Authentication tokens (auto-generate or enter manually)
 - Mirror selection (international or China mirrors)
 
-Configuration and persistent data are stored under `~/.gaia_bridge/master/`:
+Configuration and persistent data are stored under `~/.capown/master/`:
 
 ```
-~/.gaia_bridge/master/
+~/.capown/master/
 ├── config.toml    # Master configuration
 └── data/          # SQLite database (registry.db)
 ```
@@ -145,7 +145,7 @@ cd <project-root>
 DOCKER_BUILDKIT=0 docker build --no-cache --network=host \
   --build-arg APT_MIRROR=mirrors.tuna.tsinghua.edu.cn \
   --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
-  -t gaia-bridge-master -f master/Dockerfile .
+  -t capown-master -f master/Dockerfile .
 cd master/ && docker compose up -d
 # Repeat for worker/
 ```
@@ -176,8 +176,8 @@ The `--build-arg` value is not reaching the `RUN` instruction. Most likely the A
 - Verify the worker SSE connection is active (Master logs show "broker: node X connected")
 - Check worker logs:
   - Container mode: `docker compose logs worker`
-  - Linux host mode: `journalctl --user -u gaia-bridge-worker -f`
-  - Windows host mode: `schtasks /Query /TN GaiaBridgeWorker`
+  - Linux host mode: `journalctl --user -u capown-worker -f`
+  - Windows host mode: `schtasks /Query /TN CapOwnWorker`
 - **SSE line-ending mismatch**: `sse-starlette` sends events separated by `\r\n\r\n` (CRLF, per the SSE spec). If the worker splits the stream by `\n\n` (LF only), events will never be parsed. The daemon must use `\r\n\r\n` as the event delimiter, or normalize line endings first.
 - **Same-machine worker**: prefer `master_url = "http://127.0.0.1:9210"` to avoid SSE streaming issues through the public IP / NAT path.
 - **Blocking HTTP client**: `urllib.request.urlopen().read()` may hang indefinitely on SSE streams served by uvicorn. Use an async HTTP client (`httpx`, `aiohttp`) with streaming support instead.

@@ -8,11 +8,11 @@ Canonical license text:
 
 https://www.apache.org/licenses/LICENSE-2.0
 
-This notice applies to the GaiaBridge client, worker, shared protocol,
+This notice applies to the CapOwn client, worker, shared protocol,
 deployment tooling, documentation, and other files identified as Apache-2.0
 in the repository-level LICENSE file.
 
-Copyright notice for GaiaBridge:
+Copyright notice for CapOwn:
 
 Copyright (c) 2026 TappaT
 

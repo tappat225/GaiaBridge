@@ -157,7 +157,7 @@ ENV/
 env.bak/
 venv.bak/
 
-# Local GaiaBridge configuration
+# Local CapOwn configuration
 master/config.toml
 worker/config.toml
 client/config.ini
@@ -223,10 +223,11 @@ __marimo__/
 .streamlit/secrets.toml
 
 # AI
+.agents/
 .claude/
 coding_prompt/
 
-# GaiaBridge — real config files (contain sensitive data)
+# CapOwn — real config files (contain sensitive data)
 server/nginx-mcp.conf
 server/.env
 client/.env

@@ -7,12 +7,12 @@ services:
         PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.12-slim}
         APT_MIRROR: ${APT_MIRROR:-deb.debian.org}
         PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
-    container_name: gaia-bridge-master
-    image: gaia-bridge-master
+    container_name: capown-master
+    image: capown-master
     restart: unless-stopped
     network_mode: host
     volumes:
-      - ${GAIABRIDGE_MASTER_DATA:-./data}:/app/data
-      - ${GAIABRIDGE_MASTER_CONFIG:-./config.toml}:/etc/gaia_bridge/master.toml:ro
+      - ${CAPOWN_MASTER_DATA:-./data}:/app/data
+      - ${CAPOWN_MASTER_CONFIG:-./config.toml}:/etc/capown/master.toml:ro
     environment:
-      - GAIABRIDGE_CONFIG=/etc/gaia_bridge/master.toml
+      - CAPOWN_CONFIG=/etc/capown/master.toml

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""INI configuration loader for the GaiaBridge client."""
+"""INI configuration loader for the CapOwn client."""
 
 import configparser
 import os
@@ -20,13 +20,13 @@ def _env(name, fallback):
 
 
 def _candidate_paths():
-    env_path = os.environ.get("GAIABRIDGE_CLIENT_CONFIG")
+    env_path = os.environ.get("CAPOWN_CLIENT_CONFIG")
     if env_path:
         yield Path(env_path).expanduser()
 
     yield Path(__file__).with_name("config.ini")
     yield Path.cwd() / "client" / "config.ini"
-    yield Path.home() / ".config" / "gaia_bridge" / "client.ini"
+    yield Path.home() / ".config" / "capown" / "client.ini"
 
 
 def _read_ini(path):

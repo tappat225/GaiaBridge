@@ -1,7 +1,7 @@
-GaiaBridge Multi-License Notice
+CapOwn Multi-License Notice
 Copyright (c) 2026 TappaT
 
-GaiaBridge uses an open-core licensing model.
+CapOwn uses an open-core licensing model.
 
 Unless a file contains a different SPDX license identifier or an explicit
 license notice, the repository is licensed as follows:
@@ -40,7 +40,7 @@ license notice, the repository is licensed as follows:
 
 3. Commercial Master Management System
 
-   GaiaBridge may include or be accompanied by commercial Master management,
+   CapOwn may include or be accompanied by commercial Master management,
    hosted service, billing, tenant administration, regional relay operations,
    enterprise policy, or other commercial cloud features.
 
@@ -51,13 +51,13 @@ license notice, the repository is licensed as follows:
 
 4. Trademark Notice
 
-   This license notice does not grant permission to use GaiaBridge names,
+   This license notice does not grant permission to use CapOwn names,
    logos, trademarks, service marks, or product branding except as required
    for reasonable descriptive use.
 
 5. Earlier MIT-Licensed Versions
 
-   If a previous public version of GaiaBridge was distributed under the MIT
+   If a previous public version of CapOwn was distributed under the MIT
    License, that historical version remains available under the license terms
    that applied to that version. New versions and new contributions after this
    license change are governed by the license boundaries described above.

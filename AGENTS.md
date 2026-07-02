@@ -1,10 +1,10 @@
-# agent.md — GaiaBridge Programming Guide
+# agent.md — CapOwn Programming Guide
 
 > This file provides project-level context and rules for AI coding assistants (Claude, Copilot, etc.).
 
 ## Project Overview
 
-GaiaBridge is a distributed multi-host remote operation and AI Agent coordination system. A central Master node manages multiple Worker nodes over HTTPS + SSE, enabling cross-network task execution.
+CapOwn is a distributed multi-host remote operation and AI Agent coordination system. A central Master node manages multiple Worker nodes over HTTPS + SSE, enabling cross-network task execution.
 
 | Component | Directory | Description |
 |---|---|---|
@@ -54,12 +54,12 @@ The `Capability` enum and mapping tables are in `shared/protocol.py`.
 
 | Command | Legacy Alias | Description |
 |---|---|---|
-| `gaia nodes` | `list_nodes` | List registered workers |
-| `gaia run <node> <cmd>` | `run_command` | Execute shell command |
-| `gaia read <node> <path>` | `read_file` | Read a file |
-| `gaia write <node> <path> <content>` | `write_file` | Write content to a file |
-| `gaia ls <node> [path]` | `list_directory` | List directory contents |
-| `gaia info <node>` | `system_info` | Show system information |
+| `capown nodes` | `list_nodes` | List registered workers |
+| `capown run <node> <cmd>` | `run_command` | Execute shell command |
+| `capown read <node> <path>` | `read_file` | Read a file |
+| `capown write <node> <path> <content>` | `write_file` | Write content to a file |
+| `capown ls <node> [path]` | `list_directory` | List directory contents |
+| `capown info <node>` | `system_info` | Show system information |
 
 Old command names remain usable for backward compatibility.
 
@@ -161,7 +161,7 @@ Cross-directory imports must go through `shared/`. Master and Worker must not im
 - Worker workspace is configured by `worker.workspace` or the `WORKSPACE_DIR`
   override. In container mode it defaults to `/workspace`; in host mode to `/`.
 - The Docker host directory mounted at `/workspace` is controlled by
-  `GAIABRIDGE_HOST_WORKSPACE`
+  `CAPOWN_HOST_WORKSPACE`
 
 ### 11. Error Handling
 
@@ -225,7 +225,7 @@ Cross-directory imports must go through `shared/`. Master and Worker must not im
   Docker provides real filesystem isolation.
 - In **host mode**, workspace is set to `/` (full host filesystem access).
   Security is enforced at the Master / tool-calling layer.
-- `GAIABRIDGE_HOST_WORKSPACE` (env) controls which host directory is
+- `CAPOWN_HOST_WORKSPACE` (env) controls which host directory is
   mounted to `/workspace` in the worker container (container mode only).
 
 ### 17. Deployment
@@ -237,11 +237,11 @@ Cross-directory imports must go through `shared/`. Master and Worker must not im
   container and host modes.
 - Host mode Worker deploys as a Linux systemd user service or a Windows
   Scheduled Task. Config is written to
-  `~/.gaia_bridge/worker/config.toml`.
-- Config directory `~/.gaia_bridge/` is cross-platform (Linux, macOS,
+  `~/.capown/worker/config.toml`.
+- Config directory `~/.capown/` is cross-platform (Linux, macOS,
   Windows) and is the **canonical home for all persistent data**:
   ```
-  ~/.gaia_bridge/
+  ~/.capown/
   ├── master/
   │   ├── config.toml         # Master configuration
   │   └── data/               # SQLite database + other persistent data
@@ -253,10 +253,10 @@ Cross-directory imports must go through `shared/`. Master and Worker must not im
   │   └── venv/               # Host-mode Python virtual environment
   └── workspace/              # Host-mode default workspace
   ```
-- Docker containers mount config and data paths from `~/.gaia_bridge/` via environment
-  variables (`GAIABRIDGE_MASTER_CONFIG`, `GAIABRIDGE_MASTER_DATA`,
-  `GAIABRIDGE_WORKER_CONFIG`). Worker container mode mounts the
-  user-selected host workspace via `GAIABRIDGE_HOST_WORKSPACE`. The
+- Docker containers mount config and data paths from `~/.capown/` via environment
+  variables (`CAPOWN_MASTER_CONFIG`, `CAPOWN_MASTER_DATA`,
+  `CAPOWN_WORKER_CONFIG`). Worker container mode mounts the
+  user-selected host workspace via `CAPOWN_HOST_WORKSPACE`. The
   docker-compose files accept these env vars for the host-side paths
-  while the container-side paths stay fixed (`/etc/gaia_bridge/`,
+  while the container-side paths stay fixed (`/etc/capown/`,
   `/app/data/`, `/workspace`).

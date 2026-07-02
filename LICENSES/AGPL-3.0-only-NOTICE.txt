@@ -12,11 +12,11 @@ Plain-text license:
 
 https://www.gnu.org/licenses/agpl-3.0.txt
 
-This notice applies to the GaiaBridge Community Master files identified as
+This notice applies to the CapOwn Community Master files identified as
 AGPL-3.0-only in the repository-level LICENSE file, including files under
 master/.
 
-Copyright notice for GaiaBridge:
+Copyright notice for CapOwn:
 
 Copyright (c) 2026 TappaT
 

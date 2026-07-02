@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""GaiaBridge unified deployment script.
+"""CapOwn unified deployment script.
 
 Dual-mode: interactive (menu-driven) or batch (CLI arguments).
 
@@ -31,10 +31,10 @@ except ImportError:
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 APP_DIR_NAMES = ("shared", "worker")
-WORKER_SERVICE_NAME = "gaia-bridge-worker"
-WORKER_WINDOWS_TASK_NAME = "GaiaBridgeWorker"
-MASTER_CONTAINER_NAME = "gaia-bridge-master"
-WORKER_CONTAINER_NAME = "gaia-bridge-worker"
+WORKER_SERVICE_NAME = "capown-worker"
+WORKER_WINDOWS_TASK_NAME = "CapOwnWorker"
+MASTER_CONTAINER_NAME = "capown-master"
+WORKER_CONTAINER_NAME = "capown-worker"
 
 
 # ---------------------------------------------------------------------------
@@ -44,7 +44,7 @@ WORKER_CONTAINER_NAME = "gaia-bridge-worker"
 def _build_parser() -> argparse.ArgumentParser:
     """Build the argument parser for batch (non-interactive) mode."""
     p = argparse.ArgumentParser(
-        description="GaiaBridge deployment script (interactive by default).",
+        description="CapOwn deployment script (interactive by default).",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
   python3 deploy.py --batch --component worker --worker-mode host --master-url https://example.com/gb --node-token tok
@@ -86,7 +86,7 @@ def _build_parser() -> argparse.ArgumentParser:
     g_worker.add_argument("--container-ws", default="/workspace",
                           help="Container workspace path (container mode, default: /workspace)")
     g_worker.add_argument("--host-ws", default=None,
-                          help="Host directory to mount (container mode, default: ~/.gaia_bridge/workspace)")
+                          help="Host directory to mount (container mode, default: ~/.capown/workspace)")
 
     # Common
     p.add_argument("--cn-mirror", action="store_true",
@@ -117,7 +117,7 @@ def _validate_batch_args(args: argparse.Namespace) -> None:
         if not args.node_id:
             args.node_id = platform.node() or "worker-1"
         if args.worker_mode == "container" and not args.host_ws:
-            args.host_ws = str(_get_user_home() / ".gaia_bridge" / "workspace")
+            args.host_ws = str(_get_user_home() / ".capown" / "workspace")
 
     if needs_master:
         if not args.node_token:
@@ -398,9 +398,9 @@ def _prepare_worker_deploy(skip_confirm: bool = False) -> bool:
     return True
 
 
-def _write_linux_launcher(gaia_dir: Path, app_dir: Path, config_path: Path, venv_dir: Path) -> Path:
+def _write_linux_launcher(capown_dir: Path, app_dir: Path, config_path: Path, venv_dir: Path) -> Path:
     """Write the Linux host-mode launcher script."""
-    launcher_dir = gaia_dir / "bin"
+    launcher_dir = capown_dir / "bin"
     launcher_dir.mkdir(parents=True, exist_ok=True)
     launcher_path = launcher_dir / "run_worker.sh"
     python_cmd = _venv_bin(venv_dir, "python")
@@ -408,7 +408,7 @@ def _write_linux_launcher(gaia_dir: Path, app_dir: Path, config_path: Path, venv
         "#!/bin/sh\n"
         "set -eu\n"
         f"cd '{app_dir}'\n"
-        f"export GAIABRIDGE_CONFIG='{config_path}'\n"
+        f"export CAPOWN_CONFIG='{config_path}'\n"
         f"exec '{python_cmd}' -m worker.daemon\n",
         encoding="utf-8",
     )
@@ -416,16 +416,16 @@ def _write_linux_launcher(gaia_dir: Path, app_dir: Path, config_path: Path, venv
     return launcher_path
 
 
-def _write_windows_launcher(gaia_dir: Path, app_dir: Path, config_path: Path, venv_dir: Path) -> Path:
+def _write_windows_launcher(capown_dir: Path, app_dir: Path, config_path: Path, venv_dir: Path) -> Path:
     """Write the Windows host-mode launcher script."""
-    launcher_dir = gaia_dir / "bin"
+    launcher_dir = capown_dir / "bin"
     launcher_dir.mkdir(parents=True, exist_ok=True)
     launcher_path = launcher_dir / "run_worker.cmd"
     python_cmd = _venv_bin(venv_dir, "python")
     launcher_path.write_text(
         "@echo off\r\n"
         f'cd /d "{app_dir}"\r\n'
-        f'set "GAIABRIDGE_CONFIG={config_path}"\r\n'
+        f'set "CAPOWN_CONFIG={config_path}"\r\n'
         f'"{python_cmd}" -m worker.daemon\r\n',
         encoding="utf-8",
     )
@@ -492,8 +492,8 @@ def _deploy_master(env: dict[str, str], params: dict, skip_confirm: bool = False
     client_token = params["client_token"]
     use_cn = params["use_cn"]
 
-    gaia_home = _get_user_home() / ".gaia_bridge"
-    master_config_dir = gaia_home / "master"
+    capown_home = _get_user_home() / ".capown"
+    master_config_dir = capown_home / "master"
     master_data_dir = master_config_dir / "data"
 
     print()
@@ -536,8 +536,8 @@ def _deploy_master(env: dict[str, str], params: dict, skip_confirm: bool = False
         env.setdefault("APT_MIRROR", "mirrors.tuna.tsinghua.edu.cn")
         env.setdefault("PIP_INDEX_URL", "https://pypi.tuna.tsinghua.edu.cn/simple")
 
-    env["GAIABRIDGE_MASTER_CONFIG"] = str(config_path)
-    env["GAIABRIDGE_MASTER_DATA"] = str(master_data_dir)
+    env["CAPOWN_MASTER_CONFIG"] = str(config_path)
+    env["CAPOWN_MASTER_DATA"] = str(master_data_dir)
 
     print("Deploying master (container mode)...")
     ret = _docker_compose_up(SCRIPT_DIR / "master", env)
@@ -613,8 +613,8 @@ def _deploy_worker_container(env: dict[str, str], node_id: str, master_url: str,
     """Deploy Worker in container mode via docker compose."""
     worker_dir = SCRIPT_DIR / "worker"
 
-    # Write worker config to ~/.gaia_bridge/worker/config.toml
-    config_dir = _get_user_home() / ".gaia_bridge" / "worker"
+    # Write worker config to ~/.capown/worker/config.toml
+    config_dir = _get_user_home() / ".capown" / "worker"
     config_dir.mkdir(parents=True, exist_ok=True)
     config_path = config_dir / "config.toml"
     _write_toml(config_path, {
@@ -636,9 +636,9 @@ def _deploy_worker_container(env: dict[str, str], node_id: str, master_url: str,
         env.setdefault("APT_MIRROR", "mirrors.tuna.tsinghua.edu.cn")
         env.setdefault("PIP_INDEX_URL", "https://pypi.tuna.tsinghua.edu.cn/simple")
 
-    env["GAIABRIDGE_HOST_WORKSPACE"] = host_workspace
-    env["GAIABRIDGE_CONTAINER_WORKSPACE"] = workspace
-    env["GAIABRIDGE_WORKER_CONFIG"] = str(config_path)
+    env["CAPOWN_HOST_WORKSPACE"] = host_workspace
+    env["CAPOWN_CONTAINER_WORKSPACE"] = workspace
+    env["CAPOWN_WORKER_CONFIG"] = str(config_path)
 
     host_path = Path(host_workspace)
     host_path.mkdir(parents=True, exist_ok=True)
@@ -664,12 +664,12 @@ def _deploy_worker_host(node_id: str, master_url: str, node_token: str,
         print("Host mode service deployment currently supports Linux and Windows only.")
         return 1
 
-    gaia_dir = _get_user_home() / ".gaia_bridge" / "worker"
-    gaia_dir.mkdir(parents=True, exist_ok=True)
-    app_dir = gaia_dir / "app"
+    capown_dir = _get_user_home() / ".capown" / "worker"
+    capown_dir.mkdir(parents=True, exist_ok=True)
+    app_dir = capown_dir / "app"
 
     # 1. Write config.toml
-    config_path = gaia_dir / "config.toml"
+    config_path = capown_dir / "config.toml"
     _write_toml(config_path, {
         "worker": {
             "mode": "host",
@@ -686,12 +686,12 @@ def _deploy_worker_host(node_id: str, master_url: str, node_token: str,
     print(f"Config written to {config_path}")
     _chown_to_real_user(config_path)
 
-    # 2. Install a stable application copy under ~/.gaia_bridge/worker/app
+    # 2. Install a stable application copy under ~/.capown/worker/app
     print(f"Installing worker application copy to {app_dir} ...")
     _sync_worker_app(app_dir)
 
     # 3. Create venv
-    venv_dir = gaia_dir / "venv"
+    venv_dir = capown_dir / "venv"
     venv_python = str(_venv_bin(venv_dir, "python"))
     pip_cmd = str(_venv_bin(venv_dir, "pip"))
 
@@ -734,15 +734,15 @@ def _deploy_worker_host(node_id: str, master_url: str, node_token: str,
 
     # 5. Install and start the platform service
     if sys.platform == "linux":
-        launcher_path = _write_linux_launcher(gaia_dir, app_dir, config_path, venv_dir)
+        launcher_path = _write_linux_launcher(capown_dir, app_dir, config_path, venv_dir)
         _deploy_worker_host_linux(launcher_path)
     else:
-        launcher_path = _write_windows_launcher(gaia_dir, app_dir, config_path, venv_dir)
+        launcher_path = _write_windows_launcher(capown_dir, app_dir, config_path, venv_dir)
         _deploy_worker_host_windows(launcher_path)
 
     # If running under sudo, fix ownership of everything we wrote so the
     # real user can manage the deployment (restart, upgrade, etc.).
-    _chown_recursive_to_real_user(gaia_dir)
+    _chown_recursive_to_real_user(capown_dir)
 
     print()
     print("Worker deployed successfully (host mode).")
@@ -773,7 +773,7 @@ def _deploy_worker_host_linux(launcher_path: Path) -> None:
 def _write_systemd_service(launcher_path: Path, systemd_dir: Path | None = None) -> Path:
     """Write the systemd user service unit file."""
     unit = f"""[Unit]
-Description=GaiaBridge Worker
+Description=CapOwn Worker
 After=network-online.target
 Wants=network-online.target
 
@@ -885,7 +885,7 @@ def _deploy_worker(env: dict[str, str], params: dict, skip_confirm: bool = False
     else:
         workspace_for_config = "/"
 
-    config_location = str(_get_user_home() / ".gaia_bridge" / "worker" / "config.toml")
+    config_location = str(_get_user_home() / ".capown" / "worker" / "config.toml")
 
     print()
     print("--- Review ---")
@@ -953,7 +953,7 @@ def _deploy_worker_interactive(env: dict[str, str]) -> int:
     if mode == "container":
         print("--- Workspace (Container Mode) ---")
         container_ws = _ask("Container workspace path", "/workspace")
-        default_host_ws = str(_get_user_home() / ".gaia_bridge" / "workspace")
+        default_host_ws = str(_get_user_home() / ".capown" / "workspace")
         host_ws = _ask("Host directory to mount", default_host_ws)
         command_timeout = "120"
         reconnect_interval = "5"
@@ -993,7 +993,7 @@ def main() -> int:
 
     # --- Interactive mode (no --batch) ---
     print("=================================")
-    print("    GaiaBridge Deployment")
+    print("    CapOwn Deployment")
     print("=================================")
     print()
 

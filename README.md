@@ -1,6 +1,6 @@
 English | [中文](README_zh.md)
 
-# GaiaBridge
+# CapOwn
 
 Multi-host remote operation and AI Agent coordination system. A central Master node manages and dispatches tasks to multiple Worker nodes over HTTPS + SSE, enabling cross-network execution without requiring inbound ports on worker machines.
 
@@ -38,7 +38,7 @@ Multi-host remote operation and AI Agent coordination system. A central Master n
 ## Directory Structure
 
 ```
-GaiaBridge/
+CapOwn/
 ├── deploy.py                       # Unified interactive deploy script (menu-driven)
 ├── shared/                         # Shared protocol and utilities
 │   ├── protocol.py                 #   Pydantic models (Node, Task, SSEEvent, enums)
@@ -70,7 +70,7 @@ GaiaBridge/
 │   ├── requirements.txt
 │   └── config.toml.example
 ├── client/                         # Client: CLI + Daemon
-│   ├── gaia_bridge_client.py
+│   ├── capown_client.py
 │   └── config.ini.example
 ├── docs/
 │   ├── deploy.md                   # Deployment guide
@@ -84,7 +84,7 @@ GaiaBridge/
 ## Quick Deploy
 
 ```bash
-cd GaiaBridge/
+cd CapOwn/
 python3 deploy.py
 ```
 
@@ -94,10 +94,10 @@ The deploy script is entirely menu-driven. It guides you through Master, Worker,
 
 ```bash
 # List registered workers
-python client/gaia_bridge_client.py nodes
+python client/capown_client.py nodes
 
 # Run a shell command on a worker
-python client/gaia_bridge_client.py run worker-1 "uname -a"
+python client/capown_client.py run worker-1 "uname -a"
 ```
 
 See [docs/user_guide.md](docs/user_guide.md) for the full user guide including configuration reference, all CLI commands, direct API usage, error codes, and capability vocabulary.
@@ -108,7 +108,7 @@ Contributions are welcome. Please open an issue or pull request on GitHub.
 
 ## License
 
-GaiaBridge uses an open-core licensing model:
+CapOwn uses an open-core licensing model:
 
 - `client/`, `worker/`, `shared/`, `docs/`, deployment tooling, and root-level project files are licensed under Apache-2.0.
 - `master/` is the Community Master and is licensed under AGPL-3.0-only.

@@ -1,4 +1,4 @@
-# GaiaBridge
+# CapOwn
 
 [English](README.md) | 中文
 
@@ -38,7 +38,7 @@
 ## 目录结构
 
 ```
-GaiaBridge/
+CapOwn/
 ├── deploy.py                       # 统一交互式部署脚本 (菜单驱动)
 ├── shared/                         # 共享协议与工具
 │   ├── protocol.py                 #   Pydantic 数据模型 (Node, Task, SSEEvent, 枚举)
@@ -70,7 +70,7 @@ GaiaBridge/
 │   ├── requirements.txt
 │   └── config.toml.example
 ├── client/                         # Client: CLI 客户端
-│   ├── gaia_bridge_client.py
+│   ├── capown_client.py
 │   └── config.ini.example
 ├── docs/
 │   ├── deploy.md                   # 部署指南 (英文)
@@ -84,7 +84,7 @@ GaiaBridge/
 ## 快速部署
 
 ```bash
-cd GaiaBridge/
+cd CapOwn/
 python3 deploy.py
 ```
 
@@ -94,10 +94,10 @@ python3 deploy.py
 
 ```bash
 # 列出已注册的 Worker
-python client/gaia_bridge_client.py nodes
+python client/capown_client.py nodes
 
 # 在指定 Worker 上执行 Shell 命令
-python client/gaia_bridge_client.py run worker-1 "uname -a"
+python client/capown_client.py run worker-1 "uname -a"
 ```
 
 完整使用指南（包括配置说明、所有 CLI 命令、直接 API 调用、错误码及能力词汇表）见 [docs/user_guide.md](docs/user_guide.md)。
@@ -108,7 +108,7 @@ python client/gaia_bridge_client.py run worker-1 "uname -a"
 
 ## License
 
-GaiaBridge 使用 open-core 授权模式：
+CapOwn 使用 open-core 授权模式：
 
 - `client/`、`worker/`、`shared/`、`docs/`、部署工具和根目录项目文件使用 Apache-2.0。
 - `master/` 是 Community Master，使用 AGPL-3.0-only。
